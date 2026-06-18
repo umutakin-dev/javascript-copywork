@@ -1,0 +1,71 @@
+<!doctype html>
+<!--
+  B0 · 04 — Reconnect with exponential backoff + bufferedAmount
+  Networks drop. A robust client reconnects automatically, waiting longer after
+  each failure (1s, 2s, 4s … capped) and resetting once it's back — the same
+  backoff idea as Part I's retry(). bufferedAmount tells you how much you've queued
+  but not yet sent (backpressure). Stop and start echo-server.js to watch it recover.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/bufferedAmount
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>B0·04 reconnect</title>
+    <style>
+      body { font: 15px system-ui; max-width: 32rem; margin: 2rem auto; }
+      #log { font: 13px monospace; white-space: pre-wrap; margin-top: 1rem; }
+    </style>
+  </head>
+  <body>
+    <p>status: <b id="status">—</b></p>
+    <form id="form"><input id="msg" placeholder="message" autocomplete="off" /><button>Send</button></form>
+    <div id="log"></div>
+    <script type="module">
+      const statusEl = document.querySelector("#status");
+      const log = document.querySelector("#log");
+      const line = (t) => {
+        const d = document.createElement("div");
+        d.textContent = t;
+        log.append(d);
+      };
+
+      const URL = "ws://localhost:3001";
+      const MAX_DELAY = 10000;
+      let ws = null;
+      let delay = 1000; // current backoff
+
+      function connect() {
+        statusEl.textContent = "connecting…";
+        ws = new WebSocket(URL);
+
+        ws.addEventListener("open", () => {
+          statusEl.textContent = "connected";
+          line("[connected]");
+          delay = 1000; // reset backoff on success
+        });
+        ws.addEventListener("message", (e) => line("← " + e.data));
+        ws.addEventListener("close", () => {
+          statusEl.textContent = `disconnected — retrying in ${delay / 1000}s`;
+          line(`[closed; reconnect in ${delay / 1000}s]`);
+          setTimeout(connect, delay);
+          delay = Math.min(delay * 2, MAX_DELAY); // exponential, capped
+        });
+        // 'error' is followed by 'close', so we only schedule the retry in close.
+        ws.addEventListener("error", () => {});
+      }
+      connect();
+
+      document.querySelector("#form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const input = document.querySelector("#msg");
+        if (ws?.readyState === WebSocket.OPEN && input.value) {
+          ws.send(input.value);
+          line(`→ ${input.value}  (bufferedAmount: ${ws.bufferedAmount})`); // backpressure gauge
+          input.value = "";
+        } else {
+          line("(not connected — message dropped)");
+        }
+      });
+    </script>
+  </body>
+</html>

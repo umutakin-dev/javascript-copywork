@@ -1,0 +1,72 @@
+<!doctype html>
+<!--
+  B0 · 02 — A multi-client chat (browser client)
+  Start chat-server.js, then open this page in TWO tabs with different names.
+  Each client connects with ?user=NAME; the server broadcasts join / leave / msg
+  events as JSON to every connected client.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/WebSocket
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>B0·02 chat</title>
+    <style>
+      body { font: 15px system-ui; max-width: 32rem; margin: 2rem auto; }
+      #log { margin: 1rem 0; }
+      #log div { padding: .1rem 0; }
+      .system { color: #888; font-style: italic; }
+      .me { color: #06c; }
+    </style>
+  </head>
+  <body>
+    <form id="join">
+      <input id="name" placeholder="your name" value="guest" autocomplete="off" />
+      <button>Join</button>
+    </form>
+    <div id="log"></div>
+    <form id="say" hidden>
+      <input id="text" placeholder="message" autocomplete="off" />
+      <button>Send</button>
+    </form>
+
+    <script type="module">
+      const log = document.querySelector("#log");
+      const line = (text, cls = "") => {
+        const div = document.createElement("div");
+        div.textContent = text;
+        div.className = cls;
+        log.append(div);
+      };
+
+      let ws;
+      let me = "";
+      document.querySelector("#join").addEventListener("submit", (e) => {
+        e.preventDefault();
+        me = document.querySelector("#name").value || "anon";
+        ws = new WebSocket(`ws://localhost:3002?user=${encodeURIComponent(me)}`);
+
+        ws.addEventListener("open", () => {
+          document.querySelector("#join").hidden = true;
+          document.querySelector("#say").hidden = false;
+        });
+        ws.addEventListener("message", (event) => {
+          const m = JSON.parse(event.data);
+          if (m.type === "join") line(`→ ${m.user} joined`, "system");
+          else if (m.type === "leave") line(`← ${m.user} left`, "system");
+          else if (m.type === "system") line(m.text, "system");
+          else if (m.type === "msg") line(`${m.user}: ${m.text}`, m.user === me ? "me" : "");
+        });
+        ws.addEventListener("close", () => line("(disconnected)", "system"));
+      });
+
+      document.querySelector("#say").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const input = document.querySelector("#text");
+        if (ws?.readyState === WebSocket.OPEN && input.value) {
+          ws.send(input.value); // the server echoes it back to us as a "msg"
+          input.value = "";
+        }
+      });
+    </script>
+  </body>
+</html>

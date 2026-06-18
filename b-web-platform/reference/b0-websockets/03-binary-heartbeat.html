@@ -1,0 +1,70 @@
+<!doctype html>
+<!--
+  B0 · 03 — Binary frames + an application-level heartbeat
+  WebSocket carries binary too: set ws.binaryType = "arraybuffer" and send a typed
+  array; you get an ArrayBuffer back. The browser API doesn't expose protocol
+  ping/pong frames, so liveness is done at the app level: send "ping" on a timer
+  and treat the echoed reply as the "pong". (Uses echo-server.js.)
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/binaryType
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>B0·03 binary + heartbeat</title>
+    <style>
+      body { font: 15px system-ui; max-width: 32rem; margin: 2rem auto; }
+      #log { font: 13px monospace; white-space: pre-wrap; margin-top: 1rem; }
+    </style>
+  </head>
+  <body>
+    <p>status: <b id="status">connecting…</b> · heartbeat: <b id="hb">—</b></p>
+    <button id="sendBinary">Send 8 random bytes</button>
+    <div id="log"></div>
+    <script type="module">
+      const statusEl = document.querySelector("#status");
+      const hb = document.querySelector("#hb");
+      const log = document.querySelector("#log");
+      const line = (t) => {
+        const d = document.createElement("div");
+        d.textContent = t;
+        log.append(d);
+      };
+
+      const ws = new WebSocket("ws://localhost:3001");
+      ws.binaryType = "arraybuffer"; // receive binary as ArrayBuffer (not Blob)
+      let lastPong = 0;
+
+      ws.addEventListener("open", () => {
+        statusEl.textContent = "connected";
+        lastPong = performance.now();
+        // Heartbeat: ping every 2s; the echo comes back as our "pong".
+        setInterval(() => ws.readyState === WebSocket.OPEN && ws.send("ping"), 2000);
+        // Watchdog: how long since we last heard back?
+        setInterval(() => {
+          hb.textContent = `${Math.round((performance.now() - lastPong) / 1000)}s since last pong`;
+        }, 500);
+      });
+
+      ws.addEventListener("message", (event) => {
+        lastPong = performance.now();
+        if (event.data instanceof ArrayBuffer) {
+          const bytes = [...new Uint8Array(event.data)];
+          line("← binary: [" + bytes.join(", ") + "]");
+        } else if (event.data === "ping") {
+          // our heartbeat echo — keep quiet
+        } else {
+          line("← " + event.data);
+        }
+      });
+      ws.addEventListener("close", () => (statusEl.textContent = "closed"));
+      ws.addEventListener("error", () => (statusEl.textContent = "error — server running?"));
+
+      document.querySelector("#sendBinary").addEventListener("click", () => {
+        if (ws.readyState !== WebSocket.OPEN) return;
+        const bytes = new Uint8Array(8).map(() => Math.floor(Math.random() * 256));
+        ws.send(bytes); // send the binary frame
+        line("→ binary: [" + [...bytes].join(", ") + "]");
+      });
+    </script>
+  </body>
+</html>
