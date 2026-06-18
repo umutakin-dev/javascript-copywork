@@ -1,0 +1,71 @@
+<!doctype html>
+<!--
+  A3 · 05 — A full-screen shader playground (the "shadertoy" pattern)
+  One full-screen quad + a fragment shader fed u_time and u_resolution. Everything
+  is computed PER PIXEL from position and time — no geometry beyond the quad. This
+  is the canvas for procedural graphics, and where post-processing lives in A8.
+  Edit the fragment shader and reload to experiment.
+  Ref: https://thebookofshaders.com/
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A3·05 shader playground</title>
+    <style>canvas { width: 360px; height: 360px; border: 1px solid #999; }</style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <script type="module">
+      import { createProgram, resizeToDisplaySize, glsl } from "../a1-webgl-first/gl.js";
+
+      const canvas = document.querySelector("#c");
+      const gl = canvas.getContext("webgl2");
+      if (!gl) throw new Error("WebGL2 not available");
+
+      const vs = glsl`#version 300 es
+        in vec2 a_position;
+        void main() { gl_Position = vec4(a_position, 0.0, 1.0); }`;
+
+      const fs = glsl`#version 300 es
+        precision highp float;
+        uniform vec2 u_resolution;
+        uniform float u_time;
+        out vec4 outColor;
+        void main() {
+          // Center and aspect-correct: (0,0) in the middle, y in -1..1.
+          vec2 uv = (gl_FragCoord.xy * 2.0 - u_resolution) / u_resolution.y;
+          float d = length(uv);                               // distance from center
+          float rings = 0.5 + 0.5 * sin(d * 12.0 - u_time * 3.0); // animated rings
+          vec3 col = 0.5 + 0.5 * cos(u_time + uv.xyx + vec3(0.0, 2.0, 4.0)); // hue cycle
+          outColor = vec4(col * rings, 1.0);
+        }`;
+
+      const program = createProgram(gl, vs, fs);
+
+      const vao = gl.createVertexArray();
+      gl.bindVertexArray(vao);
+      const buf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+      const posLoc = gl.getAttribLocation(program, "a_position");
+      gl.enableVertexAttribArray(posLoc);
+      gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+      const uRes = gl.getUniformLocation(program, "u_resolution");
+      const uTime = gl.getUniformLocation(program, "u_time");
+      gl.useProgram(program);
+      gl.bindVertexArray(vao);
+
+      function frame(nowMs) {
+        resizeToDisplaySize(canvas);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.uniform2f(uRes, canvas.width, canvas.height);
+        gl.uniform1f(uTime, nowMs / 1000);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+      console.log("procedural animated shader running");
+    </script>
+  </body>
+</html>

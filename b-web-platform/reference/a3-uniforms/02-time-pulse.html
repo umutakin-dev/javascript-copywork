@@ -1,0 +1,65 @@
+<!doctype html>
+<!--
+  A3 · 02 — Animation: a requestAnimationFrame loop + a u_time uniform
+  Each frame, pass the elapsed time into the shader and recompute from it. This
+  is the heartbeat of every WebGL animation: update uniforms → clear → redraw →
+  request the next frame.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/Window/requestAnimationFrame
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A3·02 time pulse</title>
+    <style>canvas { width: 320px; height: 240px; border: 1px solid #999; }</style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <script type="module">
+      import { createProgram, resizeToDisplaySize, glsl } from "../a1-webgl-first/gl.js";
+
+      const canvas = document.querySelector("#c");
+      const gl = canvas.getContext("webgl2");
+      if (!gl) throw new Error("WebGL2 not available");
+
+      const vs = glsl`#version 300 es
+        in vec2 a_position;
+        void main() { gl_Position = vec4(a_position, 0.0, 1.0); }`;
+      const fs = glsl`#version 300 es
+        precision highp float;
+        uniform float u_time;
+        out vec4 outColor;
+        void main() {
+          // sin() returns -1..1; remap to 0..1 for a smooth pulse.
+          float pulse = 0.5 + 0.5 * sin(u_time * 2.0);
+          outColor = vec4(pulse, 0.3, 1.0 - pulse, 1.0);
+        }`;
+      const program = createProgram(gl, vs, fs);
+
+      const vao = gl.createVertexArray();
+      gl.bindVertexArray(vao);
+      const buf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0.6, -0.6, -0.6, 0.6, -0.6]), gl.STATIC_DRAW);
+      const posLoc = gl.getAttribLocation(program, "a_position");
+      gl.enableVertexAttribArray(posLoc);
+      gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+      const uTime = gl.getUniformLocation(program, "u_time");
+      resizeToDisplaySize(canvas);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.useProgram(program);
+      gl.bindVertexArray(vao);
+
+      function frame(nowMs) {
+        // rAF hands you a high-resolution timestamp in milliseconds.
+        gl.clearColor(0.1, 0.12, 0.16, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.uniform1f(uTime, nowMs / 1000); // seconds
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+      console.log("animating the fragment color via u_time");
+    </script>
+  </body>
+</html>
