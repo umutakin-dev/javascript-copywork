@@ -1,0 +1,88 @@
+<!doctype html>
+<!--
+  A10 · 06 — A compute shader: double a buffer on the GPU (GPGPU hello-world)
+  Compute shaders run general work on the GPU, not tied to drawing. Here a storage
+  buffer of numbers is doubled in parallel — one invocation per element. We then
+  COPY the result into a mappable buffer and read it back to the CPU to check it.
+  (No canvas needed — this is pure computation.)
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/GPUComputePassEncoder
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A10·06 compute double</title>
+    <style>
+      pre { font-size: 14px; }
+      #msg { color: #b00; }
+    </style>
+  </head>
+  <body>
+    <pre id="out">running…</pre>
+    <p id="msg"></p>
+    <script type="module">
+      import { wgsl } from "./gpu.js";
+
+      const out = document.querySelector("#out");
+      const msg = document.querySelector("#msg");
+      try {
+        if (!navigator.gpu) throw new Error("WebGPU not available — try Chrome/Edge.");
+        const adapter = await navigator.gpu.requestAdapter(); // no canvas for pure compute
+        const device = await adapter.requestDevice();
+
+        const module = device.createShaderModule({
+          code: wgsl`
+            @group(0) @binding(0) var<storage, read_write> data: array<f32>;
+            @compute @workgroup_size(64)
+            fn main(@builtin(global_invocation_id) gid: vec3u) {
+              let i = gid.x;
+              if (i < arrayLength(&data)) {
+                data[i] = data[i] * 2.0;
+              }
+            }`,
+        });
+
+        const input = new Float32Array([1, 2, 3, 4, 5, 6, 7, 8]);
+        const storage = device.createBuffer({
+          size: input.byteLength,
+          usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+        });
+        device.queue.writeBuffer(storage, 0, input);
+
+        const pipeline = device.createComputePipeline({
+          layout: "auto",
+          compute: { module, entryPoint: "main" },
+        });
+        const bindGroup = device.createBindGroup({
+          layout: pipeline.getBindGroupLayout(0),
+          entries: [{ binding: 0, resource: { buffer: storage } }],
+        });
+
+        const encoder = device.createCommandEncoder();
+        const pass = encoder.beginComputePass();
+        pass.setPipeline(pipeline);
+        pass.setBindGroup(0, bindGroup);
+        pass.dispatchWorkgroups(Math.ceil(input.length / 64)); // one workgroup of 64 here
+        pass.end();
+
+        // Copy the storage buffer into a mappable buffer so the CPU can read it.
+        const readback = device.createBuffer({
+          size: input.byteLength,
+          usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+        });
+        encoder.copyBufferToBuffer(storage, 0, readback, 0, input.byteLength);
+        device.queue.submit([encoder.finish()]);
+
+        await readback.mapAsync(GPUMapMode.READ);
+        const result = new Float32Array(readback.getMappedRange()).slice();
+        readback.unmap();
+
+        out.textContent = `in:  [${[...input].join(", ")}]\nout: [${[...result].join(", ")}]`;
+        console.log("doubled on the GPU:", [...result]);
+        console.assert(result.every((v, i) => v === input[i] * 2), "every value doubled");
+      } catch (e) {
+        msg.textContent = e.message;
+        console.error(e);
+      }
+    </script>
+  </body>
+</html>

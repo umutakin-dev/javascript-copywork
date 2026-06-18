@@ -1,0 +1,133 @@
+<!doctype html>
+<!--
+  A10 · 04 — Textures + samplers in WGSL (a textured quad)
+  A bind group can hold a SAMPLER and a TEXTURE. In WGSL you read them with
+  textureSample(tex, samp, uv). We build a small checker texture in code,
+  writeTexture it to the GPU, and sample it across a quad.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/GPUQueue/writeTexture
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A10·04 textured quad</title>
+    <style>
+      canvas { width: 300px; height: 300px; border: 1px solid #999; }
+      #msg { color: #b00; }
+    </style>
+  </head>
+  <body>
+    <canvas id="c" width="600" height="600"></canvas>
+    <p id="msg"></p>
+    <script type="module">
+      import { initWebGPU, wgsl } from "./gpu.js";
+
+      const canvas = document.querySelector("#c");
+      const msg = document.querySelector("#msg");
+      try {
+        const { device, context, format } = await initWebGPU(canvas);
+
+        const module = device.createShaderModule({
+          code: wgsl`
+            struct VsOut {
+              @builtin(position) pos: vec4f,
+              @location(0) uv: vec2f,
+            };
+            @vertex
+            fn vs(@location(0) position: vec2f, @location(1) uv: vec2f) -> VsOut {
+              var out: VsOut;
+              out.pos = vec4f(position, 0.0, 1.0);
+              out.uv = uv;
+              return out;
+            }
+            @group(0) @binding(0) var samp: sampler;
+            @group(0) @binding(1) var tex: texture_2d<f32>;
+            @fragment
+            fn fs(in: VsOut) -> @location(0) vec4f {
+              return textureSample(tex, samp, in.uv);
+            }`,
+        });
+
+        // A quad (two triangles): x, y, u, v.
+        const verts = new Float32Array([
+          -0.8, 0.8, 0, 0, -0.8, -0.8, 0, 1, 0.8, 0.8, 1, 0,
+          0.8, 0.8, 1, 0, -0.8, -0.8, 0, 1, 0.8, -0.8, 1, 1,
+        ]);
+        const vbo = device.createBuffer({
+          size: verts.byteLength,
+          usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+        });
+        device.queue.writeBuffer(vbo, 0, verts);
+
+        // Build an 8×8 checker texture in code.
+        const SIZE = 8;
+        const data = new Uint8Array(SIZE * SIZE * 4);
+        for (let y = 0; y < SIZE; y++) {
+          for (let x = 0; x < SIZE; x++) {
+            const on = (x + y) % 2 === 0;
+            const i = (y * SIZE + x) * 4;
+            data[i] = on ? 235 : 40;
+            data[i + 1] = on ? 180 : 50;
+            data[i + 2] = on ? 70 : 90;
+            data[i + 3] = 255;
+          }
+        }
+        const texture = device.createTexture({
+          size: [SIZE, SIZE],
+          format: "rgba8unorm",
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+        });
+        device.queue.writeTexture({ texture }, data, { bytesPerRow: SIZE * 4, rowsPerImage: SIZE }, [SIZE, SIZE]);
+        const sampler = device.createSampler({ magFilter: "nearest", minFilter: "nearest" });
+
+        const pipeline = device.createRenderPipeline({
+          layout: "auto",
+          vertex: {
+            module,
+            entryPoint: "vs",
+            buffers: [
+              {
+                arrayStride: 4 * 4,
+                attributes: [
+                  { shaderLocation: 0, offset: 0, format: "float32x2" },
+                  { shaderLocation: 1, offset: 2 * 4, format: "float32x2" },
+                ],
+              },
+            ],
+          },
+          fragment: { module, entryPoint: "fs", targets: [{ format }] },
+          primitive: { topology: "triangle-list" },
+        });
+
+        const bindGroup = device.createBindGroup({
+          layout: pipeline.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: sampler },
+            { binding: 1, resource: texture.createView() },
+          ],
+        });
+
+        const encoder = device.createCommandEncoder();
+        const pass = encoder.beginRenderPass({
+          colorAttachments: [
+            {
+              view: context.getCurrentTexture().createView(),
+              clearValue: { r: 0.1, g: 0.12, b: 0.16, a: 1 },
+              loadOp: "clear",
+              storeOp: "store",
+            },
+          ],
+        });
+        pass.setPipeline(pipeline);
+        pass.setBindGroup(0, bindGroup);
+        pass.setVertexBuffer(0, vbo);
+        pass.draw(6);
+        pass.end();
+        device.queue.submit([encoder.finish()]);
+        console.log("textured quad sampled in WGSL");
+      } catch (e) {
+        msg.textContent = e.message;
+        console.error(e);
+      }
+    </script>
+  </body>
+</html>
