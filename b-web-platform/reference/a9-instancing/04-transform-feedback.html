@@ -1,0 +1,145 @@
+<!doctype html>
+<!--
+  A9 · 04 — Transform feedback: update particles entirely on the GPU  (:stretch:)
+  Transform feedback captures a vertex shader's outputs back into a BUFFER instead
+  of drawing them. So the "update" pass runs the simulation in a vertex shader and
+  writes the new positions/velocities to a second buffer; we PING-PONG the two
+  buffers each frame, then a render pass draws the points. No CPU per-particle work.
+  Because the varyings must be named BEFORE linking, this builds its update program
+  by hand (gl.js's createProgram links immediately).
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/WebGL2RenderingContext/transformFeedbackVaryings
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A9·04 transform feedback</title>
+    <style>canvas { width: 380px; height: 380px; border: 1px solid #999; background: #05060a; }</style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <script type="module">
+      import { createProgram, createShader, glsl } from "../a1-webgl-first/gl.js";
+
+      const canvas = document.querySelector("#c");
+      canvas.width = 760;
+      canvas.height = 760;
+      const gl = canvas.getContext("webgl2");
+      if (!gl) throw new Error("WebGL2 not available");
+
+      // --- update program: simulate in the vertex shader, capture outputs via TF ---
+      function createUpdateProgram(vsSrc, fsSrc, varyings) {
+        const prog = gl.createProgram();
+        gl.attachShader(prog, createShader(gl, gl.VERTEX_SHADER, vsSrc));
+        gl.attachShader(prog, createShader(gl, gl.FRAGMENT_SHADER, fsSrc));
+        gl.transformFeedbackVaryings(prog, varyings, gl.INTERLEAVED_ATTRIBS); // BEFORE link
+        gl.linkProgram(prog);
+        if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+          throw new Error(`update program link failed:\n${gl.getProgramInfoLog(prog)}`);
+        }
+        return prog;
+      }
+      const updateProg = createUpdateProgram(
+        glsl`#version 300 es
+          layout(location=0) in vec2 a_position;
+          layout(location=1) in vec2 a_velocity;
+          uniform float u_dt;
+          out vec2 v_position;
+          out vec2 v_velocity;
+          void main() {
+            vec2 vel = a_velocity + vec2(0.0, -0.45) * u_dt; // gravity
+            vec2 pos = a_position + vel * u_dt;
+            if (pos.y < -1.0) {            // fell off the bottom → respawn at top
+              pos = vec2(a_position.x, 1.0);
+              vel = vec2(vel.x * 0.4, 0.0);
+            }
+            if (pos.x < -1.0) pos.x += 2.0; // wrap horizontally
+            if (pos.x > 1.0) pos.x -= 2.0;
+            v_position = pos;
+            v_velocity = vel;
+            gl_Position = vec4(pos, 0.0, 1.0); // unused (rasterizer is discarded)
+          }`,
+        glsl`#version 300 es
+          void main() {}`,
+        ["v_position", "v_velocity"],
+      );
+      const uDt = gl.getUniformLocation(updateProg, "u_dt");
+
+      // --- render program: draw the particles as points (gl.js is fine here) ---
+      const renderProg = createProgram(
+        gl,
+        glsl`#version 300 es
+          layout(location=0) in vec2 a_position;
+          layout(location=1) in vec2 a_velocity;
+          out float v_speed;
+          void main() {
+            v_speed = length(a_velocity);
+            gl_PointSize = 2.0;
+            gl_Position = vec4(a_position, 0.0, 1.0);
+          }`,
+        glsl`#version 300 es
+          precision highp float; in float v_speed; out vec4 outColor;
+          void main() { outColor = vec4(0.3 + v_speed, 0.7, 1.0, 1.0); }`,
+      );
+
+      // --- two particle buffers (state = position.xy, velocity.xy) ---
+      const COUNT = 6000;
+      const initial = new Float32Array(COUNT * 4);
+      for (let i = 0; i < COUNT; i++) {
+        initial[i * 4] = Math.random() * 2 - 1; // x
+        initial[i * 4 + 1] = Math.random() * 2 - 1; // y
+        initial[i * 4 + 2] = (Math.random() - 0.5) * 0.3; // vx
+        initial[i * 4 + 3] = Math.random() * 0.2; // vy
+      }
+      function makeBuffer(data) {
+        const buf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_COPY);
+        return buf;
+      }
+      function makeVAO(buffer) {
+        const vao = gl.createVertexArray();
+        gl.bindVertexArray(vao);
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        const FLOAT = 4;
+        const stride = 4 * FLOAT;
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, stride, 0); // position
+        gl.enableVertexAttribArray(1);
+        gl.vertexAttribPointer(1, 2, gl.FLOAT, false, stride, 2 * FLOAT); // velocity
+        gl.bindVertexArray(null);
+        return vao;
+      }
+      const bufA = makeBuffer(initial);
+      const bufB = makeBuffer(initial.byteLength); // empty, same size
+      let src = { buffer: bufA, vao: makeVAO(bufA) };
+      let dst = { buffer: bufB, vao: makeVAO(bufB) };
+
+      function frame() {
+        // UPDATE: run the sim, writing src → dst via transform feedback.
+        gl.useProgram(updateProg);
+        gl.uniform1f(uDt, 0.016);
+        gl.bindVertexArray(src.vao); // inputs from src
+        gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 0, dst.buffer); // outputs to dst
+        gl.enable(gl.RASTERIZER_DISCARD); // no fragments — this pass only writes a buffer
+        gl.beginTransformFeedback(gl.POINTS);
+        gl.drawArrays(gl.POINTS, 0, COUNT);
+        gl.endTransformFeedback();
+        gl.disable(gl.RASTERIZER_DISCARD);
+        gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 0, null);
+
+        // RENDER: draw the freshly-updated dst as points.
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.clearColor(0.02, 0.02, 0.04, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.useProgram(renderProg);
+        gl.bindVertexArray(dst.vao);
+        gl.drawArrays(gl.POINTS, 0, COUNT);
+
+        [src, dst] = [dst, src]; // ping-pong for next frame
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+      console.log(`${COUNT} particles simulated on the GPU via transform feedback`);
+    </script>
+  </body>
+</html>
