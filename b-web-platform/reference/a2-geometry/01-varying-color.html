@@ -1,0 +1,81 @@
+<!doctype html>
+<!--
+  A2 · 01 — Varyings: a per-vertex color, interpolated across the triangle
+  Add a SECOND attribute (a_color) in its own buffer. The vertex shader writes it
+  to an `out` varying; the rasterizer smoothly interpolates that varying across
+  the face, so a red/green/blue-cornered triangle becomes a gradient.
+  Builds on A1·02 (this adds the color attribute + the varying).
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Data
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A2·01 varying color</title>
+    <style>canvas { width: 320px; height: 240px; border: 1px solid #999; }</style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <script type="module">
+      import { createProgram, resizeToDisplaySize, glsl } from "../a1-webgl-first/gl.js";
+
+      const canvas = document.querySelector("#c");
+      const gl = canvas.getContext("webgl2");
+      if (!gl) throw new Error("WebGL2 not available");
+
+      const vs = glsl`#version 300 es
+        in vec2 a_position;
+        in vec3 a_color;
+        out vec3 v_color;          // varying: vertex shader -> fragment shader
+        void main() {
+          v_color = a_color;       // pass through; the rasterizer interpolates it
+          gl_Position = vec4(a_position, 0.0, 1.0);
+        }`;
+
+      const fs = glsl`#version 300 es
+        precision highp float;
+        in vec3 v_color;           // arrives interpolated, per fragment
+        out vec4 outColor;
+        void main() {
+          outColor = vec4(v_color, 1.0);
+        }`;
+
+      const program = createProgram(gl, vs, fs);
+
+      const vao = gl.createVertexArray();
+      gl.bindVertexArray(vao);
+
+      // Buffer 1: positions.
+      const posLoc = gl.getAttribLocation(program, "a_position");
+      const posBuf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        0.0, 0.6,
+        -0.6, -0.6,
+        0.6, -0.6,
+      ]), gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(posLoc);
+      gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+      // Buffer 2: one color per vertex (a SEPARATE buffer).
+      const colorLoc = gl.getAttribLocation(program, "a_color");
+      const colorBuf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, colorBuf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        1, 0, 0, // red
+        0, 1, 0, // green
+        0, 0, 1, // blue
+      ]), gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(colorLoc);
+      gl.vertexAttribPointer(colorLoc, 3, gl.FLOAT, false, 0, 0);
+
+      resizeToDisplaySize(canvas);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.clearColor(0.1, 0.12, 0.16, 1.0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.useProgram(program);
+      gl.bindVertexArray(vao);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      console.log("drew an interpolated (rainbow) triangle");
+    </script>
+  </body>
+</html>

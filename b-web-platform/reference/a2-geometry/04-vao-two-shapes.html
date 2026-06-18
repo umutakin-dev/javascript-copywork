@@ -1,0 +1,77 @@
+<!doctype html>
+<!--
+  A2 · 04 — VAOs capture attribute state: switch shapes by binding a VAO
+  A Vertex Array Object records the whole "how to feed the attributes" setup —
+  which buffers, strides, offsets, which attributes are enabled. Build two VAOs
+  once; then drawing each shape is just bindVertexArray + draw, with no need to
+  re-specify any of it.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/WebGL2RenderingContext/createVertexArray
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A2·04 two VAOs</title>
+    <style>canvas { width: 320px; height: 240px; border: 1px solid #999; }</style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <script type="module">
+      import { createProgram, resizeToDisplaySize, glsl } from "../a1-webgl-first/gl.js";
+
+      const canvas = document.querySelector("#c");
+      const gl = canvas.getContext("webgl2");
+      if (!gl) throw new Error("WebGL2 not available");
+
+      const vs = glsl`#version 300 es
+        in vec2 a_position; in vec3 a_color; out vec3 v_color;
+        void main() { v_color = a_color; gl_Position = vec4(a_position, 0.0, 1.0); }`;
+      const fs = glsl`#version 300 es
+        precision highp float; in vec3 v_color; out vec4 outColor;
+        void main() { outColor = vec4(v_color, 1.0); }`;
+      const program = createProgram(gl, vs, fs);
+      const posLoc = gl.getAttribLocation(program, "a_position");
+      const colorLoc = gl.getAttribLocation(program, "a_color");
+
+      // Build a self-contained VAO from interleaved [x,y, r,g,b] records.
+      function makeShape(records) {
+        const vao = gl.createVertexArray();
+        gl.bindVertexArray(vao);
+        const buf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(records), gl.STATIC_DRAW);
+        const FLOAT = 4;
+        const stride = 5 * FLOAT;
+        gl.enableVertexAttribArray(posLoc);
+        gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, stride, 0);
+        gl.enableVertexAttribArray(colorLoc);
+        gl.vertexAttribPointer(colorLoc, 3, gl.FLOAT, false, stride, 2 * FLOAT);
+        gl.bindVertexArray(null); // stop recording into this VAO
+        return vao;
+      }
+
+      // A warm triangle on the left, a cool square (2 triangles) on the right.
+      const triangle = makeShape([
+        -0.7, 0.3, 1, 0.6, 0,
+        -1.0, -0.3, 1, 0, 0.3,
+        -0.4, -0.3, 1, 0.9, 0,
+      ]);
+      const square = makeShape([
+        0.4, 0.3, 0, 0.6, 1, 0.9, 0.3, 0.2, 0.4, 1, 0.9, -0.3, 0, 0.2, 0.8,
+        0.4, 0.3, 0, 0.6, 1, 0.9, -0.3, 0, 0.2, 0.8, 0.4, -0.3, 0.4, 0, 1,
+      ]);
+
+      resizeToDisplaySize(canvas);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.clearColor(0.1, 0.12, 0.16, 1.0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.useProgram(program);
+
+      // Each draw is now just: bind the VAO, draw. No attribute setup here.
+      gl.bindVertexArray(triangle);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gl.bindVertexArray(square);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      console.log("drew two shapes by swapping VAOs");
+    </script>
+  </body>
+</html>
