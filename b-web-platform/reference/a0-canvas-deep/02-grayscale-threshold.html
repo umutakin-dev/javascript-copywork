@@ -1,0 +1,37 @@
+<!doctype html>
+<!--
+  A0 · 02 — Per-pixel effects by hand: grayscale, then threshold
+  Grayscale = a luminance-weighted average of R,G,B (eyes favor green).
+  Threshold = push each gray pixel to pure black or white. Two of the most basic
+  image operations, both just arithmetic over the pixel array.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/getImageData
+-->
+<html lang="en">
+  <head><meta charset="utf-8" /><title>A0·02 grayscale + threshold</title></head>
+  <body>
+    <canvas id="c" width="256" height="160"></canvas>
+    <script type="module">
+      const ctx = document.querySelector("#c").getContext("2d");
+      const grad = ctx.createLinearGradient(0, 0, 256, 160);
+      grad.addColorStop(0, "rebeccapurple");
+      grad.addColorStop(1, "deepskyblue");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 256, 160);
+      ctx.font = "bold 48px sans-serif";
+      ctx.fillStyle = "white";
+      ctx.fillText("Hi", 90, 100);
+
+      const img = ctx.getImageData(0, 0, 256, 160);
+      const px = img.data;
+      const THRESHOLD = 128;
+      for (let i = 0; i < px.length; i += 4) {
+        // Rec. 601 luma weights.
+        const gray = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+        const v = gray < THRESHOLD ? 0 : 255; // comment this line out for plain grayscale
+        px[i] = px[i + 1] = px[i + 2] = v;
+      }
+      ctx.putImageData(img, 0, 0);
+      console.log("applied grayscale + threshold");
+    </script>
+  </body>
+</html>

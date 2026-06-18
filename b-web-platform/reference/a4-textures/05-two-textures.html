@@ -1,0 +1,101 @@
+<!doctype html>
+<!--
+  A4 · 05 — Two texture units: blend two textures in one shader
+  A shader can read several textures at once. Each sampler is bound to a TEXTURE
+  UNIT (TEXTURE0, TEXTURE1, …); you tell the sampler which unit via uniform1i.
+  Here we mix a checker and a gradient left-to-right with mix(a, b, v_uv.x).
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/activeTexture
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A4·05 two textures</title>
+    <style>canvas { width: 320px; height: 280px; border: 1px solid #999; }</style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <script type="module">
+      import { createProgram, resizeToDisplaySize, glsl } from "../a1-webgl-first/gl.js";
+
+      const canvas = document.querySelector("#c");
+      const gl = canvas.getContext("webgl2");
+      if (!gl) throw new Error("WebGL2 not available");
+
+      const vs = glsl`#version 300 es
+        in vec2 a_position; in vec2 a_uv; out vec2 v_uv;
+        void main() { v_uv = a_uv; gl_Position = vec4(a_position, 0.0, 1.0); }`;
+      const fs = glsl`#version 300 es
+        precision highp float;
+        in vec2 v_uv;
+        uniform sampler2D u_tex0;
+        uniform sampler2D u_tex1;
+        out vec4 outColor;
+        void main() {
+          vec4 a = texture(u_tex0, v_uv);
+          vec4 b = texture(u_tex1, v_uv);
+          outColor = mix(a, b, v_uv.x); // left = tex0, right = tex1
+        }`;
+      const program = createProgram(gl, vs, fs);
+
+      const verts = new Float32Array([
+        -0.8, 0.8, 0, 1, -0.8, -0.8, 0, 0, 0.8, 0.8, 1, 1,
+        0.8, 0.8, 1, 1, -0.8, -0.8, 0, 0, 0.8, -0.8, 1, 0,
+      ]);
+      const vao = gl.createVertexArray();
+      gl.bindVertexArray(vao);
+      const vbo = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+      gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
+      const FLOAT = 4;
+      const stride = 4 * FLOAT;
+      const posLoc = gl.getAttribLocation(program, "a_position");
+      gl.enableVertexAttribArray(posLoc);
+      gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, stride, 0);
+      const uvLoc = gl.getAttribLocation(program, "a_uv");
+      gl.enableVertexAttribArray(uvLoc);
+      gl.vertexAttribPointer(uvLoc, 2, gl.FLOAT, false, stride, 2 * FLOAT);
+
+      function makeDataTexture(size, fn) {
+        const pixels = new Uint8Array(size * size * 4);
+        for (let y = 0; y < size; y++) {
+          for (let x = 0; x < size; x++) {
+            const [r, g, b] = fn(x, y);
+            const i = (y * size + x) * 4;
+            pixels[i] = r;
+            pixels[i + 1] = g;
+            pixels[i + 2] = b;
+            pixels[i + 3] = 255;
+          }
+        }
+        const tex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        return tex;
+      }
+      const checker = makeDataTexture(8, (x, y) => ((x + y) % 2 ? [40, 40, 40] : [230, 230, 230]));
+      const gradient = makeDataTexture(8, (x, y) => [(x / 7) * 255, (y / 7) * 255, 120]);
+
+      resizeToDisplaySize(canvas);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.clearColor(0.1, 0.12, 0.16, 1.0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.useProgram(program);
+
+      // Point each sampler at a texture UNIT, then bind a texture to that unit.
+      gl.uniform1i(gl.getUniformLocation(program, "u_tex0"), 0);
+      gl.uniform1i(gl.getUniformLocation(program, "u_tex1"), 1);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, checker);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, gradient);
+
+      gl.bindVertexArray(vao);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      console.log("blended two textures across two units");
+    </script>
+  </body>
+</html>

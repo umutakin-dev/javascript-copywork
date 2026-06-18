@@ -1,0 +1,60 @@
+<!doctype html>
+<!--
+  A3 · 03 — gl_FragCoord + u_resolution: the fragment shader as f(pixel)
+  A fragment shader runs once PER PIXEL. gl_FragCoord.xy is the pixel's position
+  in the framebuffer; divide by u_resolution to get 0..1 coordinates, and you can
+  compute a color from position alone — here a gradient. Drawn on a full-screen
+  quad (two triangles covering clip space), so every pixel runs the shader.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/WebGL2RenderingContext
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A3·03 fragcoord gradient</title>
+    <style>canvas { width: 320px; height: 240px; border: 1px solid #999; }</style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <script type="module">
+      import { createProgram, resizeToDisplaySize, glsl } from "../a1-webgl-first/gl.js";
+
+      const canvas = document.querySelector("#c");
+      const gl = canvas.getContext("webgl2");
+      if (!gl) throw new Error("WebGL2 not available");
+
+      const vs = glsl`#version 300 es
+        in vec2 a_position;
+        void main() { gl_Position = vec4(a_position, 0.0, 1.0); }`;
+      const fs = glsl`#version 300 es
+        precision highp float;
+        uniform vec2 u_resolution;
+        out vec4 outColor;
+        void main() {
+          vec2 uv = gl_FragCoord.xy / u_resolution; // 0..1 across the canvas
+          outColor = vec4(uv.x, uv.y, 0.5, 1.0);     // red→right, green→up
+        }`;
+      const program = createProgram(gl, vs, fs);
+
+      // A full-screen quad: two triangles covering clip space -1..1.
+      const vao = gl.createVertexArray();
+      gl.bindVertexArray(vao);
+      const buf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        -1, -1, 1, -1, -1, 1,
+        -1, 1, 1, -1, 1, 1,
+      ]), gl.STATIC_DRAW);
+      const posLoc = gl.getAttribLocation(program, "a_position");
+      gl.enableVertexAttribArray(posLoc);
+      gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+      resizeToDisplaySize(canvas);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.useProgram(program);
+      gl.uniform2f(gl.getUniformLocation(program, "u_resolution"), canvas.width, canvas.height);
+      gl.bindVertexArray(vao);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      console.log("gradient computed per pixel from gl_FragCoord");
+    </script>
+  </body>
+</html>

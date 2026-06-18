@@ -1,0 +1,153 @@
+<!doctype html>
+<!--
+  A10 · 07 — A compute-driven particle system (Track A capstone)
+  One storage buffer holds every particle's position + velocity. A COMPUTE pass
+  updates them in parallel each frame (gravity + respawn); a RENDER pass then reads
+  the SAME buffer in the vertex shader (indexed by vertex_index) and draws points.
+  All the simulation lives on the GPU.
+  Note: WebGPU point-list draws 1px points, so this is a fine starfield.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A10·07 compute particles</title>
+    <style>
+      canvas { width: 380px; height: 380px; border: 1px solid #999; background: #05060a; }
+      #msg { color: #b00; }
+    </style>
+  </head>
+  <body>
+    <canvas id="c" width="760" height="760"></canvas>
+    <p id="msg"></p>
+    <script type="module">
+      import { initWebGPU, wgsl } from "./gpu.js";
+
+      const canvas = document.querySelector("#c");
+      const msg = document.querySelector("#msg");
+      try {
+        const { device, context, format } = await initWebGPU(canvas);
+
+        const COUNT = 8000;
+        // Each particle: pos.xy, vel.xy (4 floats = 16 bytes, nicely aligned).
+        const initial = new Float32Array(COUNT * 4);
+        for (let i = 0; i < COUNT; i++) {
+          initial[i * 4] = Math.random() * 2 - 1;
+          initial[i * 4 + 1] = Math.random() * 2 - 1;
+          initial[i * 4 + 2] = (Math.random() - 0.5) * 0.3;
+          initial[i * 4 + 3] = Math.random() * 0.2;
+        }
+        const particles = device.createBuffer({
+          size: initial.byteLength,
+          usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        });
+        device.queue.writeBuffer(particles, 0, initial);
+
+        // Params (dt) — uniform buffers are 16-byte aligned.
+        const params = device.createBuffer({
+          size: 16,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+        device.queue.writeBuffer(params, 0, new Float32Array([0.016, 0, 0, 0]));
+
+        // --- compute pass: update the particles in place ---
+        const computeModule = device.createShaderModule({
+          code: wgsl`
+            struct Particle { pos: vec2f, vel: vec2f };
+            @group(0) @binding(0) var<storage, read_write> particles: array<Particle>;
+            struct Params { dt: f32 };
+            @group(0) @binding(1) var<uniform> params: Params;
+            @compute @workgroup_size(64)
+            fn main(@builtin(global_invocation_id) gid: vec3u) {
+              let i = gid.x;
+              if (i >= arrayLength(&particles)) { return; }
+              var p = particles[i];
+              p.vel.y = p.vel.y - 0.45 * params.dt;   // gravity
+              p.pos = p.pos + p.vel * params.dt;
+              if (p.pos.y < -1.0) { p.pos.y = 1.0; p.vel.y = 0.0; } // respawn at top
+              if (p.pos.x < -1.0) { p.pos.x = p.pos.x + 2.0; }       // wrap x
+              if (p.pos.x > 1.0) { p.pos.x = p.pos.x - 2.0; }
+              particles[i] = p;
+            }`,
+        });
+        const computePipeline = device.createComputePipeline({
+          layout: "auto",
+          compute: { module: computeModule, entryPoint: "main" },
+        });
+        const computeBind = device.createBindGroup({
+          layout: computePipeline.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: { buffer: particles } },
+            { binding: 1, resource: { buffer: params } },
+          ],
+        });
+
+        // --- render pass: the vertex shader reads the SAME buffer (read-only) ---
+        const renderModule = device.createShaderModule({
+          code: wgsl`
+            struct Particle { pos: vec2f, vel: vec2f };
+            @group(0) @binding(0) var<storage, read> particles: array<Particle>;
+            struct VsOut { @builtin(position) pos: vec4f, @location(0) speed: f32 };
+            @vertex
+            fn vs(@builtin(vertex_index) i: u32) -> VsOut {
+              let p = particles[i];
+              var out: VsOut;
+              out.pos = vec4f(p.pos, 0.0, 1.0);
+              out.speed = length(p.vel);
+              return out;
+            }
+            @fragment
+            fn fs(in: VsOut) -> @location(0) vec4f {
+              return vec4f(0.3 + in.speed, 0.7, 1.0, 1.0);
+            }`,
+        });
+        const renderPipeline = device.createRenderPipeline({
+          layout: "auto",
+          vertex: { module: renderModule, entryPoint: "vs" },
+          fragment: { module: renderModule, entryPoint: "fs", targets: [{ format }] },
+          primitive: { topology: "point-list" },
+        });
+        const renderBind = device.createBindGroup({
+          layout: renderPipeline.getBindGroupLayout(0),
+          entries: [{ binding: 0, resource: { buffer: particles } }],
+        });
+
+        const workgroups = Math.ceil(COUNT / 64);
+        function frame() {
+          const encoder = device.createCommandEncoder();
+
+          // 1) compute: advance the simulation
+          const compute = encoder.beginComputePass();
+          compute.setPipeline(computePipeline);
+          compute.setBindGroup(0, computeBind);
+          compute.dispatchWorkgroups(workgroups);
+          compute.end();
+
+          // 2) render: draw the updated particles
+          const render = encoder.beginRenderPass({
+            colorAttachments: [
+              {
+                view: context.getCurrentTexture().createView(),
+                clearValue: { r: 0.02, g: 0.02, b: 0.04, a: 1 },
+                loadOp: "clear",
+                storeOp: "store",
+              },
+            ],
+          });
+          render.setPipeline(renderPipeline);
+          render.setBindGroup(0, renderBind);
+          render.draw(COUNT);
+          render.end();
+
+          device.queue.submit([encoder.finish()]);
+          requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+        console.log(`${COUNT} particles simulated by a compute shader`);
+      } catch (e) {
+        msg.textContent = e.message;
+        console.error(e);
+      }
+    </script>
+  </body>
+</html>

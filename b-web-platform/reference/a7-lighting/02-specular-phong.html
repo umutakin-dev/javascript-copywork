@@ -1,0 +1,120 @@
+<!doctype html>
+<!--
+  A7 · 02 — Specular highlights (Blinn-Phong), per fragment, with a moving light
+  Add a shiny highlight: the half-vector H = normalize(L + V) between the light
+  and the view direction; specular = pow(max(dot(N, H), 0), shininess). A sphere
+  and an orbiting point light make the highlight slide across the surface.
+  Ref: https://en.wikipedia.org/wiki/Blinn%E2%80%93Phong_reflection_model
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A7·02 Blinn-Phong</title>
+    <style>canvas { width: 360px; height: 360px; border: 1px solid #999; }</style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <script type="module">
+      import { createProgram, resizeToDisplaySize, glsl } from "../a1-webgl-first/gl.js";
+      import { perspective, lookAt, multiply, identity, normalMatrix, toRadians } from "../a5-math/math.js";
+      import { makeSphere } from "./geometry.js";
+
+      const canvas = document.querySelector("#c");
+      const gl = canvas.getContext("webgl2");
+      if (!gl) throw new Error("WebGL2 not available");
+
+      const vs = glsl`#version 300 es
+        in vec3 a_position;
+        in vec3 a_normal;
+        uniform mat4 u_mvp;
+        uniform mat4 u_model;
+        uniform mat3 u_normalMatrix;
+        out vec3 v_normal;
+        out vec3 v_worldPos;
+        void main() {
+          v_worldPos = (u_model * vec4(a_position, 1.0)).xyz;
+          v_normal = u_normalMatrix * a_normal;
+          gl_Position = u_mvp * vec4(a_position, 1.0);
+        }`;
+      const fs = glsl`#version 300 es
+        precision highp float;
+        in vec3 v_normal;
+        in vec3 v_worldPos;
+        uniform vec3 u_lightPos;
+        uniform vec3 u_lightColor;
+        uniform vec3 u_cameraPos;
+        uniform vec3 u_ambient;
+        uniform vec3 u_albedo;
+        uniform float u_shininess;
+        out vec4 outColor;
+        void main() {
+          vec3 N = normalize(v_normal);
+          vec3 L = normalize(u_lightPos - v_worldPos); // toward the light
+          vec3 V = normalize(u_cameraPos - v_worldPos); // toward the camera
+          vec3 H = normalize(L + V);                    // half-vector
+          float diff = max(dot(N, L), 0.0);
+          float spec = pow(max(dot(N, H), 0.0), u_shininess);
+          vec3 color = u_ambient * u_albedo
+                     + diff * u_albedo * u_lightColor
+                     + spec * u_lightColor; // highlight takes the light's color
+          outColor = vec4(color, 1.0);
+        }`;
+      const program = createProgram(gl, vs, fs);
+
+      const sphere = makeSphere();
+      const vao = gl.createVertexArray();
+      gl.bindVertexArray(vao);
+      const vbo = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+      gl.bufferData(gl.ARRAY_BUFFER, sphere.vertices, gl.STATIC_DRAW);
+      const FLOAT = 4;
+      const stride = 6 * FLOAT;
+      const posLoc = gl.getAttribLocation(program, "a_position");
+      gl.enableVertexAttribArray(posLoc);
+      gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, stride, 0);
+      const normLoc = gl.getAttribLocation(program, "a_normal");
+      gl.enableVertexAttribArray(normLoc);
+      gl.vertexAttribPointer(normLoc, 3, gl.FLOAT, false, stride, 3 * FLOAT);
+      const ibo = gl.createBuffer();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, sphere.indices, gl.STATIC_DRAW);
+
+      const uMvp = gl.getUniformLocation(program, "u_mvp");
+      const uModel = gl.getUniformLocation(program, "u_model");
+      const uNormalMatrix = gl.getUniformLocation(program, "u_normalMatrix");
+      const uLightPos = gl.getUniformLocation(program, "u_lightPos");
+
+      const camera = [0, 0, 4];
+      gl.enable(gl.DEPTH_TEST);
+      gl.useProgram(program);
+      gl.bindVertexArray(vao);
+      gl.uniform3fv(gl.getUniformLocation(program, "u_cameraPos"), camera);
+      gl.uniform3f(gl.getUniformLocation(program, "u_lightColor"), 1.0, 1.0, 1.0);
+      gl.uniform3f(gl.getUniformLocation(program, "u_ambient"), 0.08, 0.08, 0.1);
+      gl.uniform3f(gl.getUniformLocation(program, "u_albedo"), 0.25, 0.5, 0.9);
+      gl.uniform1f(gl.getUniformLocation(program, "u_shininess"), 64.0);
+
+      const model = identity(); // sphere sits at the origin
+      const view = lookAt(camera, [0, 0, 0], [0, 1, 0]);
+
+      function frame(nowMs) {
+        const t = nowMs / 1000;
+        resizeToDisplaySize(canvas);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.clearColor(0.06, 0.07, 0.09, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        const proj = perspective(toRadians(50), canvas.width / canvas.height, 0.1, 100);
+        gl.uniformMatrix4fv(uMvp, false, multiply(multiply(proj, view), model));
+        gl.uniformMatrix4fv(uModel, false, model);
+        gl.uniformMatrix3fv(uNormalMatrix, false, normalMatrix(model));
+        // The light orbits the sphere, so the highlight slides around.
+        gl.uniform3f(uLightPos, 3 * Math.cos(t), 1.5, 3 * Math.sin(t));
+        gl.drawElements(gl.TRIANGLES, sphere.indexCount, gl.UNSIGNED_SHORT, 0);
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+      console.log("a glossy sphere with an orbiting light");
+    </script>
+  </body>
+</html>

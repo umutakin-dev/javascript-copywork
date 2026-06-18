@@ -1,0 +1,35 @@
+<!doctype html>
+<!--
+  A1 · 01 — A WebGL2 context, sized correctly, cleared to a color
+  The WebGL pipeline (you'll build it up over A2–A7):
+      vertices → [VERTEX SHADER] → clip space (-1..1) → rasterizer → fragments
+              → [FRAGMENT SHADER] → pixels in the framebuffer
+  This file just proves the context works and sizes the drawing buffer to the
+  displayed size × devicePixelRatio (so it isn't blurry on HiDPI screens).
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/WebGL2RenderingContext
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A1·01 context + clear</title>
+    <style>canvas { width: 320px; height: 200px; border: 1px solid #999; }</style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <script type="module">
+      const canvas = document.querySelector("#c");
+      const gl = canvas.getContext("webgl2");
+      if (!gl) throw new Error("WebGL2 not available in this browser");
+
+      // Match the drawing buffer to the CSS size in device pixels.
+      const dpr = window.devicePixelRatio ?? 1;
+      canvas.width = Math.round(320 * dpr);
+      canvas.height = Math.round(200 * dpr);
+      gl.viewport(0, 0, canvas.width, canvas.height); // clip space → pixel rectangle
+
+      gl.clearColor(0.1, 0.12, 0.16, 1.0); // RGBA in 0..1 (not 0..255)
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      console.log(`WebGL2 ok — ${gl.getParameter(gl.VERSION)}`);
+    </script>
+  </body>
+</html>

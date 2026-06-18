@@ -1,0 +1,40 @@
+<!doctype html>
+<!--
+  A0 · 05 — Compositing: globalAlpha and globalCompositeOperation
+  globalAlpha fades whatever you draw next. globalCompositeOperation changes the
+  BLEND rule between new pixels and what's already on the canvas (lighter,
+  multiply, xor, destination-out, …).
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/globalCompositeOperation
+-->
+<html lang="en">
+  <head><meta charset="utf-8" /><title>A0·05 compositing</title></head>
+  <body>
+    <canvas id="c" width="320" height="160" style="background:#111"></canvas>
+    <script type="module">
+      const ctx = document.querySelector("#c").getContext("2d");
+
+      // Three overlapping circles, ADDITIVELY blended -> white where all overlap.
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = 0.9;
+      const circles = [
+        [110, 80, "rgb(255,0,0)"],
+        [160, 80, "rgb(0,255,0)"],
+        [135, 110, "rgb(0,0,255)"],
+      ];
+      for (const [x, y, color] of circles) {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(x, y, 50, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Reset to normal compositing for a faded label.
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = 0.4;
+      ctx.fillStyle = "white";
+      ctx.font = "bold 28px sans-serif";
+      ctx.fillText("blend", 235, 95);
+      console.log("composited with 'lighter' + globalAlpha");
+    </script>
+  </body>
+</html>

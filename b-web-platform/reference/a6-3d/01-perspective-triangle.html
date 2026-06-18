@@ -1,0 +1,84 @@
+<!doctype html>
+<!--
+  A6 · 01 — Pass an MVP matrix: a triangle in perspective
+  Now your math.js earns its keep. Build Model·View·Projection on the CPU each
+  frame and hand it to the vertex shader as a mat4 uniform (uniformMatrix4fv).
+  Rotating the triangle about Y shows real perspective foreshortening.
+  Note: WebGL requires transpose=false — our matrices are already column-major.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/WebGL2RenderingContext/uniformMatrix
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A6·01 perspective triangle</title>
+    <style>canvas { width: 360px; height: 360px; border: 1px solid #999; }</style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <script type="module">
+      import { createProgram, resizeToDisplaySize, glsl } from "../a1-webgl-first/gl.js";
+      import { perspective, lookAt, multiply, rotationY, toRadians } from "../a5-math/math.js";
+
+      const canvas = document.querySelector("#c");
+      const gl = canvas.getContext("webgl2");
+      if (!gl) throw new Error("WebGL2 not available");
+
+      const vs = glsl`#version 300 es
+        in vec3 a_position;
+        in vec3 a_color;
+        uniform mat4 u_mvp;
+        out vec3 v_color;
+        void main() {
+          v_color = a_color;
+          gl_Position = u_mvp * vec4(a_position, 1.0); // matrix · vector (column-major)
+        }`;
+      const fs = glsl`#version 300 es
+        precision highp float; in vec3 v_color; out vec4 outColor;
+        void main() { outColor = vec4(v_color, 1.0); }`;
+      const program = createProgram(gl, vs, fs);
+
+      // x,y,z, r,g,b per vertex (z = 0; the rotation is what gives it depth).
+      const verts = new Float32Array([
+        0.0, 0.6, 0, 1, 0, 0,
+        -0.6, -0.5, 0, 0, 1, 0,
+        0.6, -0.5, 0, 0, 0, 1,
+      ]);
+      const vao = gl.createVertexArray();
+      gl.bindVertexArray(vao);
+      const vbo = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+      gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
+      const FLOAT = 4;
+      const stride = 6 * FLOAT;
+      const posLoc = gl.getAttribLocation(program, "a_position");
+      gl.enableVertexAttribArray(posLoc);
+      gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, stride, 0);
+      const colorLoc = gl.getAttribLocation(program, "a_color");
+      gl.enableVertexAttribArray(colorLoc);
+      gl.vertexAttribPointer(colorLoc, 3, gl.FLOAT, false, stride, 3 * FLOAT);
+
+      const uMvp = gl.getUniformLocation(program, "u_mvp");
+      gl.useProgram(program);
+      gl.bindVertexArray(vao);
+
+      function frame(nowMs) {
+        const t = nowMs / 1000;
+        resizeToDisplaySize(canvas);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.clearColor(0.1, 0.12, 0.16, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+
+        const model = rotationY(t); // spin about the vertical axis
+        const view = lookAt([0, 0, 2.5], [0, 0, 0], [0, 1, 0]);
+        const proj = perspective(toRadians(50), canvas.width / canvas.height, 0.1, 100);
+        const mvp = multiply(multiply(proj, view), model);
+
+        gl.uniformMatrix4fv(uMvp, false, mvp); // transpose MUST be false in WebGL
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+      console.log("triangle spinning in perspective via an MVP uniform");
+    </script>
+  </body>
+</html>

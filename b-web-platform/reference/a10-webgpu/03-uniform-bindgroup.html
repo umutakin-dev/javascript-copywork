@@ -1,0 +1,122 @@
+<!doctype html>
+<!--
+  A10 · 03 — Bind groups + a uniform buffer (an animated triangle)
+  Shaders read external data through BIND GROUPS. We make a small uniform buffer
+  holding the time, expose it at @group(0) @binding(0), and rewrite it each frame.
+  The vertex shader rotates the triangle by that time and the color pulses.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroup
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A10·03 uniform + bind group</title>
+    <style>
+      canvas { width: 320px; height: 320px; border: 1px solid #999; }
+      #msg { color: #b00; }
+    </style>
+  </head>
+  <body>
+    <canvas id="c" width="640" height="640"></canvas>
+    <p id="msg"></p>
+    <script type="module">
+      import { initWebGPU, wgsl } from "./gpu.js";
+
+      const canvas = document.querySelector("#c");
+      const msg = document.querySelector("#msg");
+      try {
+        const { device, context, format } = await initWebGPU(canvas);
+
+        const module = device.createShaderModule({
+          code: wgsl`
+            struct Uniforms { time: f32 };
+            @group(0) @binding(0) var<uniform> u: Uniforms;
+
+            struct VsOut {
+              @builtin(position) pos: vec4f,
+              @location(0) color: vec3f,
+            };
+            @vertex
+            fn vs(@location(0) position: vec2f, @location(1) color: vec3f) -> VsOut {
+              let c = cos(u.time);
+              let s = sin(u.time);
+              let rotated = vec2f(position.x * c - position.y * s, position.x * s + position.y * c);
+              var out: VsOut;
+              out.pos = vec4f(rotated, 0.0, 1.0);
+              out.color = color * (0.5 + 0.5 * sin(u.time * 2.0));
+              return out;
+            }
+            @fragment
+            fn fs(in: VsOut) -> @location(0) vec4f { return vec4f(in.color, 1.0); }`,
+        });
+
+        const verts = new Float32Array([
+          0.0, 0.6, 1, 0, 0,
+          -0.6, -0.6, 0, 1, 0,
+          0.6, -0.6, 0, 0, 1,
+        ]);
+        const vbo = device.createBuffer({
+          size: verts.byteLength,
+          usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+        });
+        device.queue.writeBuffer(vbo, 0, verts);
+
+        const pipeline = device.createRenderPipeline({
+          layout: "auto",
+          vertex: {
+            module,
+            entryPoint: "vs",
+            buffers: [
+              {
+                arrayStride: 5 * 4,
+                attributes: [
+                  { shaderLocation: 0, offset: 0, format: "float32x2" },
+                  { shaderLocation: 1, offset: 2 * 4, format: "float32x3" },
+                ],
+              },
+            ],
+          },
+          fragment: { module, entryPoint: "fs", targets: [{ format }] },
+          primitive: { topology: "triangle-list" },
+        });
+
+        // Uniform buffers are 16-byte aligned, so allocate 16 even for one f32.
+        const uniformBuffer = device.createBuffer({
+          size: 16,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+        const bindGroup = device.createBindGroup({
+          layout: pipeline.getBindGroupLayout(0),
+          entries: [{ binding: 0, resource: { buffer: uniformBuffer } }],
+        });
+
+        function frame(nowMs) {
+          device.queue.writeBuffer(uniformBuffer, 0, new Float32Array([nowMs / 1000, 0, 0, 0]));
+
+          const encoder = device.createCommandEncoder();
+          const pass = encoder.beginRenderPass({
+            colorAttachments: [
+              {
+                view: context.getCurrentTexture().createView(), // a fresh texture each frame
+                clearValue: { r: 0.1, g: 0.12, b: 0.16, a: 1 },
+                loadOp: "clear",
+                storeOp: "store",
+              },
+            ],
+          });
+          pass.setPipeline(pipeline);
+          pass.setBindGroup(0, bindGroup);
+          pass.setVertexBuffer(0, vbo);
+          pass.draw(3);
+          pass.end();
+          device.queue.submit([encoder.finish()]);
+          requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+        console.log("animated WGSL triangle via a uniform bind group");
+      } catch (e) {
+        msg.textContent = e.message;
+        console.error(e);
+      }
+    </script>
+  </body>
+</html>

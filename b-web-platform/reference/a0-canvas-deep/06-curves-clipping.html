@@ -1,0 +1,48 @@
+<!doctype html>
+<!--
+  A0 · 06 — Curves and clipping: bezier/quadratic paths + a clip() region
+  quadraticCurveTo (one control point) and bezierCurveTo (two) build smooth
+  paths. clip() turns the current path into a mask — subsequent drawing only
+  shows through it.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/clip
+-->
+<html lang="en">
+  <head><meta charset="utf-8" /><title>A0·06 curves + clip</title></head>
+  <body>
+    <canvas id="c" width="240" height="180"></canvas>
+    <script type="module">
+      const ctx = document.querySelector("#c").getContext("2d");
+
+      // A circular clip; everything drawn until restore() is masked to it.
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(120, 90, 80, 0, Math.PI * 2);
+      ctx.clip();
+
+      const grad = ctx.createLinearGradient(0, 0, 240, 180);
+      grad.addColorStop(0, "teal");
+      grad.addColorStop(1, "orange");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 240, 180); // fills the whole canvas, but only the circle shows
+      ctx.restore(); // drop the clip
+
+      // A smooth wave with two quadratic curves.
+      ctx.beginPath();
+      ctx.moveTo(20, 90);
+      ctx.quadraticCurveTo(70, 30, 120, 90); // control (70,30), end (120,90)
+      ctx.quadraticCurveTo(170, 150, 220, 90);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "white";
+      ctx.stroke();
+
+      // A closed blob from two cubic beziers.
+      ctx.beginPath();
+      ctx.moveTo(120, 30);
+      ctx.bezierCurveTo(180, 30, 180, 150, 120, 150);
+      ctx.bezierCurveTo(60, 150, 60, 30, 120, 30);
+      ctx.strokeStyle = "rgba(0,0,0,.5)";
+      ctx.stroke();
+      console.log("clipped fill + quadratic & bezier curves");
+    </script>
+  </body>
+</html>

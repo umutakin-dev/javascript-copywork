@@ -1,0 +1,50 @@
+<!doctype html>
+<!--
+  A10 · 01 — Hello WebGPU: adapter → device → context, clear the canvas
+  The WebGPU setup dance: request an adapter, then a device, configure the canvas
+  context with the preferred format, then RECORD commands into an encoder and
+  SUBMIT them to the device's queue. Here the only command is a render pass that
+  clears to a color. (:verify-support: needs a WebGPU-capable browser.)
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A10·01 clear</title>
+    <style>
+      canvas { width: 320px; height: 200px; border: 1px solid #999; }
+      #msg { color: #b00; }
+    </style>
+  </head>
+  <body>
+    <canvas id="c" width="640" height="400"></canvas>
+    <p id="msg"></p>
+    <script type="module">
+      import { initWebGPU } from "./gpu.js";
+
+      const canvas = document.querySelector("#c");
+      const msg = document.querySelector("#msg");
+      try {
+        const { device, context } = await initWebGPU(canvas);
+
+        const encoder = device.createCommandEncoder(); // records GPU commands
+        const pass = encoder.beginRenderPass({
+          colorAttachments: [
+            {
+              view: context.getCurrentTexture().createView(),
+              clearValue: { r: 0.1, g: 0.12, b: 0.16, a: 1 },
+              loadOp: "clear", // clear at the start of the pass
+              storeOp: "store", // keep the result
+            },
+          ],
+        });
+        pass.end();
+        device.queue.submit([encoder.finish()]); // hand the commands to the GPU
+        console.log("WebGPU cleared the canvas");
+      } catch (e) {
+        msg.textContent = e.message;
+        console.error(e);
+      }
+    </script>
+  </body>
+</html>

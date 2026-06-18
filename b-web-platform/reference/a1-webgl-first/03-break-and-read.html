@@ -1,0 +1,48 @@
+<!doctype html>
+<!--
+  A1 · 03 — Break it on purpose: read the shader info log
+  WebGL won't tell you a shader is broken — it just draws nothing. Here we feed a
+  shader with an undefined variable to createProgram and CATCH the thrown info
+  log, which points at the exact line. This is the whole reason gl.js throws.
+  The second block shows checkError catching a different class of bug: bad API
+  usage (an invalid enum), which sets gl.getError() rather than failing to compile.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/getError
+-->
+<html lang="en">
+  <head><meta charset="utf-8" /><title>A1·03 read the info log</title></head>
+  <body>
+    <pre id="out"></pre>
+    <canvas id="c" width="10" height="10"></canvas>
+    <script type="module">
+      import { createProgram, checkError, glsl } from "./gl.js";
+      const out = document.querySelector("#out");
+      const gl = document.querySelector("#c").getContext("webgl2");
+
+      const goodVs = glsl`#version 300 es
+        in vec2 a_position;
+        void main() { gl_Position = vec4(a_position, 0.0, 1.0); }`;
+
+      const brokenFs = glsl`#version 300 es
+        precision highp float;
+        out vec4 outColor;
+        void main() { outColor = vec4(notAColor, 0.0, 0.0, 1.0); }`; // notAColor is undefined
+
+      // 1) A compile error → createProgram throws the driver's log.
+      try {
+        createProgram(gl, goodVs, brokenFs);
+      } catch (err) {
+        out.textContent = err.message; // includes a line number
+        console.log("caught the compile error (silent failure avoided)");
+      }
+
+      // 2) A bad API call → no exception, but gl.getError() is set; checkError throws.
+      try {
+        gl.enable(gl.TRIANGLES); // TRIANGLES is not a capability → INVALID_ENUM
+        checkError(gl, "enable(TRIANGLES)");
+      } catch (err) {
+        out.textContent += "\n\n" + err.message;
+        console.log("caught the GL error via checkError");
+      }
+    </script>
+  </body>
+</html>

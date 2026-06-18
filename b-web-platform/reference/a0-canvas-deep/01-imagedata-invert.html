@@ -1,0 +1,38 @@
+<!doctype html>
+<!--
+  A0 · 01 — ImageData: read and write raw pixels (invert colors)
+  getImageData gives you a flat Uint8ClampedArray of RGBA bytes (4 per pixel,
+  each 0..255). Mutate it, then putImageData it back. This is the foundation of
+  every pixel effect — and exactly what a fragment shader does later, per pixel.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/ImageData
+-->
+<html lang="en">
+  <head><meta charset="utf-8" /><title>A0·01 ImageData invert</title></head>
+  <body>
+    <canvas id="c" width="256" height="160"></canvas>
+    <script type="module">
+      const ctx = document.querySelector("#c").getContext("2d");
+
+      // Draw something to read back (a gradient + a white square).
+      const grad = ctx.createLinearGradient(0, 0, 256, 0);
+      grad.addColorStop(0, "crimson");
+      grad.addColorStop(1, "gold");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 256, 160);
+      ctx.fillStyle = "white";
+      ctx.fillRect(96, 56, 64, 48);
+
+      // Pull every pixel. data = [r,g,b,a, r,g,b,a, ...].
+      const img = ctx.getImageData(0, 0, 256, 160);
+      const px = img.data;
+      for (let i = 0; i < px.length; i += 4) {
+        px[i] = 255 - px[i]; // R
+        px[i + 1] = 255 - px[i + 1]; // G
+        px[i + 2] = 255 - px[i + 2]; // B
+        // px[i + 3] is alpha — leave it alone
+      }
+      ctx.putImageData(img, 0, 0);
+      console.log(`inverted ${px.length / 4} pixels`);
+    </script>
+  </body>
+</html>

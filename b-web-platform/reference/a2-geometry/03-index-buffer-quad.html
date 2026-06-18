@@ -1,0 +1,75 @@
+<!doctype html>
+<!--
+  A2 · 03 — Index buffer: a quad from 4 vertices and 6 indices
+  A rectangle is two triangles sharing an edge. Rather than repeat the shared
+  corners (6 vertices), store 4 UNIQUE vertices plus an ELEMENT_ARRAY_BUFFER of
+  indices that says which vertices each triangle uses. drawElements reads them.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/drawElements
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A2·03 index buffer</title>
+    <style>canvas { width: 320px; height: 240px; border: 1px solid #999; }</style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <script type="module">
+      import { createProgram, resizeToDisplaySize, glsl } from "../a1-webgl-first/gl.js";
+
+      const canvas = document.querySelector("#c");
+      const gl = canvas.getContext("webgl2");
+      if (!gl) throw new Error("WebGL2 not available");
+
+      const vs = glsl`#version 300 es
+        in vec2 a_position;
+        in vec3 a_color;
+        out vec3 v_color;
+        void main() { v_color = a_color; gl_Position = vec4(a_position, 0.0, 1.0); }`;
+      const fs = glsl`#version 300 es
+        precision highp float;
+        in vec3 v_color;
+        out vec4 outColor;
+        void main() { outColor = vec4(v_color, 1.0); }`;
+      const program = createProgram(gl, vs, fs);
+
+      const vao = gl.createVertexArray();
+      gl.bindVertexArray(vao);
+
+      // 4 corners, interleaved x,y,r,g,b.
+      const verts = new Float32Array([
+        -0.6, 0.6, 1, 0, 0, // 0 top-left   red
+        0.6, 0.6, 0, 1, 0, // 1 top-right  green
+        0.6, -0.6, 0, 0, 1, // 2 bot-right  blue
+        -0.6, -0.6, 1, 1, 0, // 3 bot-left   yellow
+      ]);
+      const vbo = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+      gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
+
+      const FLOAT = 4;
+      const stride = 5 * FLOAT;
+      const posLoc = gl.getAttribLocation(program, "a_position");
+      gl.enableVertexAttribArray(posLoc);
+      gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, stride, 0);
+      const colorLoc = gl.getAttribLocation(program, "a_color");
+      gl.enableVertexAttribArray(colorLoc);
+      gl.vertexAttribPointer(colorLoc, 3, gl.FLOAT, false, stride, 2 * FLOAT);
+
+      // Two triangles: (0,1,2) and (0,2,3). 6 indices reuse the 4 vertices.
+      const indices = new Uint16Array([0, 1, 2, 0, 2, 3]);
+      const ibo = gl.createBuffer();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo); // the bound VAO records this too
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+
+      resizeToDisplaySize(canvas);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.clearColor(0.1, 0.12, 0.16, 1.0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.useProgram(program);
+      gl.bindVertexArray(vao);
+      gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0); // 6 indices, not 6 vertices
+      console.log("drew a quad from 4 vertices + 6 indices");
+    </script>
+  </body>
+</html>

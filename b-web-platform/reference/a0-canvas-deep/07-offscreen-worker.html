@@ -1,0 +1,29 @@
+<!doctype html>
+<!--
+  A0 · 07 — OffscreenCanvas rendered in a Worker  (:verify-support:)
+  transferControlToOffscreen() hands a canvas to a Worker, which renders it OFF
+  the main thread — so the animation keeps running even when the main thread is
+  busy. Needs its sibling 07-offscreen-worker.js.
+  Support: solid in Chromium/Firefox; Safari more recent — check caniuse.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/OffscreenCanvas
+-->
+<html lang="en">
+  <head><meta charset="utf-8" /><title>A0·07 OffscreenCanvas</title></head>
+  <body>
+    <canvas id="c" width="240" height="160" style="border:1px solid #999"></canvas>
+    <button id="block">Block main thread 2s</button>
+    <script type="module">
+      const canvas = document.querySelector("#c");
+      const offscreen = canvas.transferControlToOffscreen(); // detach from main thread
+      const worker = new Worker(new URL("./07-offscreen-worker.js", import.meta.url), { type: "module" });
+      worker.postMessage({ canvas: offscreen }, [offscreen]); // TRANSFER ownership
+
+      // Prove it's off-thread: freeze the MAIN thread; the box keeps spinning.
+      document.querySelector("#block").addEventListener("click", () => {
+        const end = Date.now() + 2000;
+        while (Date.now() < end) {} // busy-wait blocks main, not the worker
+        console.log("main thread was frozen 2s — the animation never paused");
+      });
+    </script>
+  </body>
+</html>

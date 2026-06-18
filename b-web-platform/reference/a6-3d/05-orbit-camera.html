@@ -1,0 +1,122 @@
+<!doctype html>
+<!--
+  A6 · 05 — An orbit camera (drag to rotate, wheel to zoom)
+  The camera stays aimed at the origin; dragging moves it around a SPHERE
+  (azimuth + elevation), the wheel changes its radius. We convert the spherical
+  angles to a cartesian eye position, then lookAt builds the view. The cube never
+  moves — you do. Uses Pointer Events (mouse + touch + pen in one API).
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A6·05 orbit camera</title>
+    <style>
+      canvas { width: 400px; height: 360px; border: 1px solid #999; touch-action: none; cursor: grab; }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <p>drag to orbit · wheel to zoom</p>
+    <script type="module">
+      import { createProgram, resizeToDisplaySize, glsl } from "../a1-webgl-first/gl.js";
+      import { perspective, lookAt, multiply, toRadians } from "../a5-math/math.js";
+      import { makeCube } from "./geometry.js";
+
+      const canvas = document.querySelector("#c");
+      const gl = canvas.getContext("webgl2");
+      if (!gl) throw new Error("WebGL2 not available");
+
+      const vs = glsl`#version 300 es
+        in vec3 a_position; in vec3 a_color; uniform mat4 u_mvp; out vec3 v_color;
+        void main() { v_color = a_color; gl_Position = u_mvp * vec4(a_position, 1.0); }`;
+      const fs = glsl`#version 300 es
+        precision highp float; in vec3 v_color; out vec4 outColor;
+        void main() { outColor = vec4(v_color, 1.0); }`;
+      const program = createProgram(gl, vs, fs);
+
+      const cube = makeCube();
+      const vao = gl.createVertexArray();
+      gl.bindVertexArray(vao);
+      const vbo = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+      gl.bufferData(gl.ARRAY_BUFFER, cube.vertices, gl.STATIC_DRAW);
+      const FLOAT = 4;
+      const stride = 6 * FLOAT;
+      const posLoc = gl.getAttribLocation(program, "a_position");
+      gl.enableVertexAttribArray(posLoc);
+      gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, stride, 0);
+      const colorLoc = gl.getAttribLocation(program, "a_color");
+      gl.enableVertexAttribArray(colorLoc);
+      gl.vertexAttribPointer(colorLoc, 3, gl.FLOAT, false, stride, 3 * FLOAT);
+      const ibo = gl.createBuffer();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, cube.indices, gl.STATIC_DRAW);
+
+      const uMvp = gl.getUniformLocation(program, "u_mvp");
+      gl.enable(gl.DEPTH_TEST);
+      gl.enable(gl.CULL_FACE);
+      gl.useProgram(program);
+      gl.bindVertexArray(vao);
+
+      // Camera position in spherical coordinates around the origin.
+      const cam = { azimuth: 0.6, elevation: 0.4, radius: 4 };
+
+      let dragging = false;
+      let lastX = 0;
+      let lastY = 0;
+      canvas.addEventListener("pointerdown", (e) => {
+        dragging = true;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        canvas.setPointerCapture(e.pointerId);
+        canvas.style.cursor = "grabbing";
+      });
+      canvas.addEventListener("pointerup", () => {
+        dragging = false;
+        canvas.style.cursor = "grab";
+      });
+      canvas.addEventListener("pointermove", (e) => {
+        if (!dragging) return;
+        cam.azimuth -= (e.clientX - lastX) * 0.01;
+        cam.elevation += (e.clientY - lastY) * 0.01;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        // Clamp elevation so the camera never flips over the poles.
+        const limit = Math.PI / 2 - 0.05;
+        cam.elevation = Math.max(-limit, Math.min(limit, cam.elevation));
+      });
+      canvas.addEventListener(
+        "wheel",
+        (e) => {
+          e.preventDefault();
+          cam.radius *= e.deltaY > 0 ? 1.1 : 0.9;
+          cam.radius = Math.max(1.5, Math.min(20, cam.radius));
+        },
+        { passive: false },
+      );
+
+      function frame() {
+        resizeToDisplaySize(canvas);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.clearColor(0.1, 0.12, 0.16, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        // Spherical → cartesian eye position.
+        const ce = Math.cos(cam.elevation);
+        const eye = [
+          cam.radius * ce * Math.sin(cam.azimuth),
+          cam.radius * Math.sin(cam.elevation),
+          cam.radius * ce * Math.cos(cam.azimuth),
+        ];
+        const view = lookAt(eye, [0, 0, 0], [0, 1, 0]);
+        const proj = perspective(toRadians(50), canvas.width / canvas.height, 0.1, 100);
+        gl.uniformMatrix4fv(uMvp, false, multiply(proj, view)); // model is identity here
+        gl.drawElements(gl.TRIANGLES, cube.indexCount, gl.UNSIGNED_SHORT, 0);
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+      console.log("drag to orbit the camera, wheel to zoom");
+    </script>
+  </body>
+</html>
