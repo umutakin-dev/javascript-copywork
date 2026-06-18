@@ -1,6 +1,6 @@
 // Phase 0 · 01 — Your standalone runtime
 // Goal: prove you can run a plain .js file outside any browser.
-// Run it:  bun reference/phase-0-env/01-hello-runtime.js
+// Run it:  bun a-fundamentals/reference/phase-0-env/01-hello-runtime.js
 //          (or: node <file> / deno run <file>)
 //
 // Ref: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Introduction
