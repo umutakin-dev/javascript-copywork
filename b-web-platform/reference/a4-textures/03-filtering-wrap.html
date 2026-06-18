@@ -1,0 +1,112 @@
+<!doctype html>
+<!--
+  A4 · 03 — texParameteri: filtering and wrap modes
+  MIN/MAG_FILTER: NEAREST (blocky) vs LINEAR (smooth) when the texture is scaled.
+  WRAP_S/T: what happens for UVs outside 0..1 — REPEAT (tile) vs CLAMP_TO_EDGE
+  (stretch the edge). We draw with UVs up to 3.0 so wrapping is visible. Toggle
+  with the buttons.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/texParameter
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A4·03 filtering + wrap</title>
+    <style>canvas { width: 280px; height: 280px; border: 1px solid #999; }</style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <p>
+      <button id="filter">filter: NEAREST</button>
+      <button id="wrap">wrap: REPEAT</button>
+    </p>
+    <script type="module">
+      import { createProgram, resizeToDisplaySize, glsl } from "../a1-webgl-first/gl.js";
+
+      const canvas = document.querySelector("#c");
+      const gl = canvas.getContext("webgl2");
+      if (!gl) throw new Error("WebGL2 not available");
+
+      const vs = glsl`#version 300 es
+        in vec2 a_position; in vec2 a_uv; out vec2 v_uv;
+        void main() { v_uv = a_uv; gl_Position = vec4(a_position, 0.0, 1.0); }`;
+      const fs = glsl`#version 300 es
+        precision highp float; in vec2 v_uv; uniform sampler2D u_tex; out vec4 outColor;
+        void main() { outColor = texture(u_tex, v_uv); }`;
+      const program = createProgram(gl, vs, fs);
+
+      // UVs run 0..3, so the texture tiles 3× (REPEAT) or smears its edge (CLAMP).
+      const verts = new Float32Array([
+        -0.8, 0.8, 0, 3, -0.8, -0.8, 0, 0, 0.8, 0.8, 3, 3,
+        0.8, 0.8, 3, 3, -0.8, -0.8, 0, 0, 0.8, -0.8, 3, 0,
+      ]);
+      const vao = gl.createVertexArray();
+      gl.bindVertexArray(vao);
+      const vbo = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+      gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
+      const FLOAT = 4;
+      const stride = 4 * FLOAT;
+      const posLoc = gl.getAttribLocation(program, "a_position");
+      gl.enableVertexAttribArray(posLoc);
+      gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, stride, 0);
+      const uvLoc = gl.getAttribLocation(program, "a_uv");
+      gl.enableVertexAttribArray(uvLoc);
+      gl.vertexAttribPointer(uvLoc, 2, gl.FLOAT, false, stride, 2 * FLOAT);
+
+      // An 8×8 checker, built in code (power-of-two, so REPEAT + mipmaps are valid).
+      const SIZE = 8;
+      const pixels = new Uint8Array(SIZE * SIZE * 4);
+      for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+          const on = (x + y) % 2 === 0;
+          const i = (y * SIZE + x) * 4;
+          pixels[i] = on ? 230 : 40;
+          pixels[i + 1] = on ? 180 : 40;
+          pixels[i + 2] = on ? 60 : 70;
+          pixels[i + 3] = 255;
+        }
+      }
+      const tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, SIZE, SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      gl.generateMipmap(gl.TEXTURE_2D);
+
+      let nearest = true;
+      let repeat = true;
+      function applyParams() {
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, nearest ? gl.NEAREST : gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, nearest ? gl.NEAREST : gl.LINEAR_MIPMAP_LINEAR);
+        const wrap = repeat ? gl.REPEAT : gl.CLAMP_TO_EDGE;
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
+      }
+
+      function draw() {
+        applyParams();
+        resizeToDisplaySize(canvas);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.clearColor(0.1, 0.12, 0.16, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.useProgram(program);
+        gl.uniform1i(gl.getUniformLocation(program, "u_tex"), 0);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.bindVertexArray(vao);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+      }
+
+      document.querySelector("#filter").addEventListener("click", (e) => {
+        nearest = !nearest;
+        e.target.textContent = `filter: ${nearest ? "NEAREST" : "LINEAR"}`;
+        draw();
+      });
+      document.querySelector("#wrap").addEventListener("click", (e) => {
+        repeat = !repeat;
+        e.target.textContent = `wrap: ${repeat ? "REPEAT" : "CLAMP"}`;
+        draw();
+      });
+      draw();
+      console.log("toggle filter and wrap to compare");
+    </script>
+  </body>
+</html>

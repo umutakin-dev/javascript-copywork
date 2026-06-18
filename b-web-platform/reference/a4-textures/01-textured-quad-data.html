@@ -1,0 +1,85 @@
+<!doctype html>
+<!--
+  A4 · 01 — A textured quad from raw bytes (a data texture)
+  A texture is just an array of pixels living on the GPU. Here we upload a tiny
+  2×2 RGBA Uint8Array, give the quad UV coordinates (0..1), and sample it in the
+  fragment shader with texture(). NEAREST filtering blows each texel up into a
+  solid block, so you can see the 2×2 grid.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/WebGL2RenderingContext/texImage2D
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A4·01 data texture</title>
+    <style>canvas { width: 280px; height: 280px; border: 1px solid #999; }</style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <script type="module">
+      import { createProgram, resizeToDisplaySize, glsl } from "../a1-webgl-first/gl.js";
+
+      const canvas = document.querySelector("#c");
+      const gl = canvas.getContext("webgl2");
+      if (!gl) throw new Error("WebGL2 not available");
+
+      const vs = glsl`#version 300 es
+        in vec2 a_position;
+        in vec2 a_uv;
+        out vec2 v_uv;
+        void main() { v_uv = a_uv; gl_Position = vec4(a_position, 0.0, 1.0); }`;
+      const fs = glsl`#version 300 es
+        precision highp float;
+        in vec2 v_uv;
+        uniform sampler2D u_tex;     // a "sampler" reads the texture
+        out vec4 outColor;
+        void main() { outColor = texture(u_tex, v_uv); }`;
+      const program = createProgram(gl, vs, fs);
+
+      // Quad: interleaved x,y, u,v. UV v=0 is the bottom, v=1 the top.
+      const verts = new Float32Array([
+        -0.8, 0.8, 0, 1,
+        -0.8, -0.8, 0, 0,
+        0.8, 0.8, 1, 1,
+        0.8, 0.8, 1, 1,
+        -0.8, -0.8, 0, 0,
+        0.8, -0.8, 1, 0,
+      ]);
+      const vao = gl.createVertexArray();
+      gl.bindVertexArray(vao);
+      const vbo = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+      gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
+      const FLOAT = 4;
+      const stride = 4 * FLOAT;
+      const posLoc = gl.getAttribLocation(program, "a_position");
+      gl.enableVertexAttribArray(posLoc);
+      gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, stride, 0);
+      const uvLoc = gl.getAttribLocation(program, "a_uv");
+      gl.enableVertexAttribArray(uvLoc);
+      gl.vertexAttribPointer(uvLoc, 2, gl.FLOAT, false, stride, 2 * FLOAT);
+
+      // Upload a 2×2 RGBA texture from bytes. Row 0 is the BOTTOM row.
+      const tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      const pixels = new Uint8Array([
+        255, 0, 0, 255, 0, 255, 0, 255, // bottom: red,  green
+        0, 0, 255, 255, 255, 255, 0, 255, // top:    blue, yellow
+      ]);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+      resizeToDisplaySize(canvas);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.clearColor(0.1, 0.12, 0.16, 1.0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.useProgram(program);
+      gl.uniform1i(gl.getUniformLocation(program, "u_tex"), 0); // sampler reads from unit 0
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.bindVertexArray(vao);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      console.log("textured a quad with a 2×2 data texture");
+    </script>
+  </body>
+</html>
