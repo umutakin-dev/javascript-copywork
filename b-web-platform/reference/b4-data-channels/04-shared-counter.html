@@ -1,0 +1,75 @@
+<!doctype html>
+<!--
+  B4 · 04 — A tiny P2P app: a counter synced over the data channel
+  Both peers show the same number. Either side's +/- sends the new value over the
+  channel; the other applies it. This is the shape of every real-time collaborative
+  app (shared cursors, game state, whiteboards) — state changes broadcast P2P.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/RTCDataChannel/send
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>B4·04 shared counter</title>
+    <style>
+      body { font: 15px system-ui; max-width: 30rem; margin: 2rem auto; text-align: center; }
+      output { font-size: 3rem; display: block; margin: 1rem; }
+      button { font-size: 1.5rem; width: 3rem; }
+      .peer { display: inline-block; margin: 0 1rem; }
+    </style>
+  </head>
+  <body>
+    <div class="peer">
+      <h3>Peer A</h3>
+      <output id="aVal">0</output>
+      <button data-peer="a" data-delta="-1">−</button>
+      <button data-peer="a" data-delta="1">+</button>
+    </div>
+    <div class="peer">
+      <h3>Peer B</h3>
+      <output id="bVal">0</output>
+      <button data-peer="b" data-delta="-1">−</button>
+      <button data-peer="b" data-delta="1">+</button>
+    </div>
+    <script type="module">
+      import { connectLoopback, negotiate } from "./loopback.js";
+
+      let count = 0;
+      const aVal = document.querySelector("#aVal");
+      const bVal = document.querySelector("#bVal");
+      const render = () => {
+        aVal.textContent = count;
+        bVal.textContent = count;
+      };
+
+      const pcA = new RTCPeerConnection();
+      const pcB = new RTCPeerConnection();
+      connectLoopback(pcA, pcB);
+
+      const chA = pcA.createDataChannel("state");
+      let chB;
+      chA.onmessage = (e) => {
+        count = Number(e.data);
+        render();
+      };
+      pcB.ondatachannel = (e) => {
+        chB = e.channel;
+        chB.onmessage = (ev) => {
+          count = Number(ev.data);
+          render();
+        };
+      };
+
+      await negotiate(pcA, pcB);
+
+      document.body.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-peer]");
+        if (!btn) return;
+        count += Number(btn.dataset.delta);
+        render();
+        // Broadcast the new value from whichever peer was clicked.
+        const ch = btn.dataset.peer === "a" ? chA : chB;
+        if (ch?.readyState === "open") ch.send(String(count));
+      });
+    </script>
+  </body>
+</html>

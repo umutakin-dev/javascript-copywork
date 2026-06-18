@@ -1,0 +1,65 @@
+<!doctype html>
+<!--
+  B4 · 01 — RTCDataChannel: two-way text, peer to peer
+  Once connected, an RTCDataChannel is a bidirectional pipe — ch.send() on one
+  end, "message" on the other. A makes the channel (createDataChannel); B receives
+  it (ondatachannel). Here you can type from either side. (Loopback, no server.)
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/RTCDataChannel
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>B4·01 data channel text</title>
+    <style>
+      body { font: 15px system-ui; max-width: 34rem; margin: 2rem auto; }
+      #log { font: 13px monospace; white-space: pre-wrap; margin-top: 1rem; }
+      .a { color: #06c; }
+      .b { color: #080; }
+    </style>
+  </head>
+  <body>
+    <p>A: <input id="aMsg" placeholder="A says…" autocomplete="off" disabled /> <button id="aSend" disabled>Send</button></p>
+    <p>B: <input id="bMsg" placeholder="B says…" autocomplete="off" disabled /> <button id="bSend" disabled>Send</button></p>
+    <div id="log"></div>
+    <script type="module">
+      import { connectLoopback, negotiate } from "./loopback.js";
+      const log = (t, cls) => {
+        const d = document.createElement("div");
+        d.textContent = t;
+        d.className = cls;
+        document.querySelector("#log").append(d);
+      };
+
+      const pcA = new RTCPeerConnection();
+      const pcB = new RTCPeerConnection();
+      connectLoopback(pcA, pcB);
+
+      const chA = pcA.createDataChannel("chat");
+      let chB;
+      chA.onmessage = (e) => log("A ← " + e.data, "a");
+      chA.onopen = () => {
+        document.querySelector("#aMsg").disabled = false;
+        document.querySelector("#aSend").disabled = false;
+      };
+      pcB.ondatachannel = (e) => {
+        chB = e.channel; // B's end of the same channel
+        chB.onmessage = (ev) => log("B ← " + ev.data, "b");
+        document.querySelector("#bMsg").disabled = false;
+        document.querySelector("#bSend").disabled = false;
+      };
+
+      await negotiate(pcA, pcB);
+
+      const send = (ch, inputId, cls, who) => () => {
+        const input = document.querySelector(inputId);
+        if (ch?.readyState === "open" && input.value) {
+          ch.send(input.value);
+          log(`${who} → ${input.value}`, cls);
+          input.value = "";
+        }
+      };
+      document.querySelector("#aSend").addEventListener("click", send(chA, "#aMsg", "a", "A"));
+      document.querySelector("#bSend").addEventListener("click", () => send(chB, "#bMsg", "b", "B")());
+    </script>
+  </body>
+</html>
