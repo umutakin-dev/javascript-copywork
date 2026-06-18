@@ -1,0 +1,50 @@
+<!doctype html>
+<!--
+  B2 · 02 — Amplitude envelopes + scheduling a melody
+  A raw note clicks on and off. An ENVELOPE ramps the gain up (attack) and back
+  down (release) so it sounds musical. AudioParam automation (setValueAtTime +
+  linearRampToValueAtTime) schedules these shapes precisely on the audio clock —
+  perfect for sequencing notes ahead of time.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/AudioParam/linearRampToValueAtTime
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>B2·02 envelope melody</title>
+    <style>body { font: 15px system-ui; max-width: 32rem; margin: 2rem auto; }</style>
+  </head>
+  <body>
+    <p><button id="play">Play melody</button></p>
+    <script type="module">
+      // C major scale fragment (Hz): C D E F G.
+      const melody = [261.63, 293.66, 329.63, 349.23, 392.0];
+
+      function playNote(ctx, freq, startTime, duration) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.value = freq;
+        osc.connect(gain).connect(ctx.destination);
+
+        const attack = 0.02;
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(0.3, startTime + attack); // attack
+        gain.gain.linearRampToValueAtTime(0, startTime + duration); // release to silence
+
+        osc.start(startTime);
+        osc.stop(startTime + duration + 0.05);
+      }
+
+      let ctx;
+      document.querySelector("#play").addEventListener("click", () => {
+        ctx ??= new AudioContext();
+        let t = ctx.currentTime + 0.05;
+        const step = 0.32;
+        for (const freq of melody) {
+          playNote(ctx, freq, t, step); // all scheduled up front, on the audio clock
+          t += step;
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,77 @@
+<!doctype html>
+<!--
+  B2 · 05 — AnalyserNode: draw a frequency spectrum
+  An AnalyserNode taps the signal and runs an FFT. getByteFrequencyData fills an
+  array with the energy in each frequency bin (0..255), which we draw as bars. A
+  sawtooth shows a fundamental plus a stack of harmonics; slide the pitch to watch
+  them march.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/AnalyserNode/getByteFrequencyData
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>B2·05 spectrum</title>
+    <style>
+      body { font: 15px system-ui; max-width: 36rem; margin: 2rem auto; }
+      canvas { width: 100%; height: 180px; background: #0b0c10; border-radius: 8px; }
+    </style>
+  </head>
+  <body>
+    <p><button id="toggle">Start</button> <label>pitch <input id="freq" type="range" min="55" max="440" value="110" /></label></p>
+    <canvas id="c" width="700" height="360"></canvas>
+    <script type="module">
+      const ctx2d = document.querySelector("#c").getContext("2d");
+      const W = ctx2d.canvas.width;
+      const H = ctx2d.canvas.height;
+      const freq = document.querySelector("#freq");
+
+      let ctx;
+      let osc;
+      let analyser;
+      let playing = false;
+      let data;
+
+      function draw() {
+        if (!playing) return;
+        analyser.getByteFrequencyData(data); // energy per frequency bin, 0..255
+        ctx2d.fillStyle = "#0b0c10";
+        ctx2d.fillRect(0, 0, W, H);
+        const bars = 128; // show the low end where the action is
+        const bw = W / bars;
+        for (let i = 0; i < bars; i++) {
+          const v = data[i] / 255;
+          const h = v * H;
+          ctx2d.fillStyle = `hsl(${200 - v * 160}, 90%, 55%)`;
+          ctx2d.fillRect(i * bw, H - h, bw - 1, h);
+        }
+        requestAnimationFrame(draw);
+      }
+
+      document.querySelector("#toggle").addEventListener("click", (e) => {
+        ctx ??= new AudioContext();
+        if (!playing) {
+          osc = ctx.createOscillator();
+          osc.type = "sawtooth";
+          osc.frequency.value = Number(freq.value);
+          analyser = ctx.createAnalyser();
+          analyser.fftSize = 2048;
+          data = new Uint8Array(analyser.frequencyBinCount);
+          const gain = ctx.createGain();
+          gain.gain.value = 0.08;
+          osc.connect(gain).connect(analyser);
+          analyser.connect(ctx.destination); // also play it out loud
+          osc.start();
+          playing = true;
+          e.target.textContent = "Stop";
+          draw();
+        } else {
+          osc.stop();
+          playing = false;
+          e.target.textContent = "Start";
+        }
+      });
+
+      freq.addEventListener("input", () => osc && (osc.frequency.value = Number(freq.value)));
+    </script>
+  </body>
+</html>

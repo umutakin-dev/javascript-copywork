@@ -1,0 +1,60 @@
+<!doctype html>
+<!--
+  B2 · 06 — Live microphone spectrum
+  Combine B1 (getUserMedia) with B2 (AnalyserNode): feed the mic stream into an
+  analyser and draw its spectrum in real time. As before, we do NOT connect to the
+  destination — routing the mic to the speakers would howl with feedback.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/MediaStreamAudioSourceNode
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>B2·06 mic spectrum</title>
+    <style>
+      body { font: 15px system-ui; max-width: 36rem; margin: 2rem auto; }
+      canvas { width: 100%; height: 180px; background: #0b0c10; border-radius: 8px; }
+      #msg { color: #b00; }
+    </style>
+  </head>
+  <body>
+    <p><button id="start">Start mic</button></p>
+    <p id="msg"></p>
+    <canvas id="c" width="700" height="360"></canvas>
+    <script type="module">
+      const ctx2d = document.querySelector("#c").getContext("2d");
+      const W = ctx2d.canvas.width;
+      const H = ctx2d.canvas.height;
+      const msg = document.querySelector("#msg");
+
+      document.querySelector("#start").addEventListener("click", async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const audio = new AudioContext();
+          const source = audio.createMediaStreamSource(stream);
+          const analyser = audio.createAnalyser();
+          analyser.fftSize = 2048;
+          source.connect(analyser); // no destination — avoid feedback
+
+          const data = new Uint8Array(analyser.frequencyBinCount);
+          function draw() {
+            analyser.getByteFrequencyData(data);
+            ctx2d.fillStyle = "#0b0c10";
+            ctx2d.fillRect(0, 0, W, H);
+            const bars = 200;
+            const bw = W / bars;
+            for (let i = 0; i < bars; i++) {
+              const v = data[i] / 255;
+              const h = v * H;
+              ctx2d.fillStyle = `hsl(${200 - v * 160}, 90%, 55%)`;
+              ctx2d.fillRect(i * bw, H - h, bw - 1, h);
+            }
+            requestAnimationFrame(draw);
+          }
+          draw();
+        } catch (err) {
+          msg.textContent = `${err.name}: ${err.message}`;
+        }
+      });
+    </script>
+  </body>
+</html>
