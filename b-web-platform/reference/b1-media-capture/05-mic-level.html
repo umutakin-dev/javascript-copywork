@@ -1,0 +1,57 @@
+<!doctype html>
+<!--
+  B1 · 05 — A microphone level meter (a first taste of Web Audio)
+  Capture audio with getUserMedia, wire the stream into an AnalyserNode, and read
+  the waveform each frame to compute an RMS level. We DON'T connect to the speakers
+  (that would feed back). The audio graph here is the bridge to B2.
+  Note: an AudioContext must start from a user gesture (autoplay policy) → a button.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/AnalyserNode
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>B1·05 mic level</title>
+    <style>
+      body { font: 15px system-ui; max-width: 32rem; margin: 2rem auto; }
+      #meter { height: 28px; background: #eee; border-radius: 6px; overflow: hidden; }
+      #bar { height: 100%; width: 0; background: linear-gradient(90deg, #3a7, #fc3, #e44); }
+      #msg { color: #b00; }
+    </style>
+  </head>
+  <body>
+    <p><button id="start">Start mic</button></p>
+    <div id="meter"><div id="bar"></div></div>
+    <p id="msg"></p>
+    <script type="module">
+      const bar = document.querySelector("#bar");
+      const msg = document.querySelector("#msg");
+
+      document.querySelector("#start").addEventListener("click", async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const audio = new AudioContext();
+          const source = audio.createMediaStreamSource(stream);
+          const analyser = audio.createAnalyser();
+          analyser.fftSize = 1024;
+          source.connect(analyser); // graph stops here — no connection to destination
+
+          const data = new Uint8Array(analyser.fftSize);
+          function frame() {
+            analyser.getByteTimeDomainData(data); // waveform samples, 0..255 around 128
+            let sum = 0;
+            for (const v of data) {
+              const x = (v - 128) / 128; // -1..1
+              sum += x * x;
+            }
+            const rms = Math.sqrt(sum / data.length); // 0..1 loudness
+            bar.style.width = `${Math.min(100, rms * 250)}%`;
+            requestAnimationFrame(frame);
+          }
+          frame();
+        } catch (err) {
+          msg.textContent = `${err.name}: ${err.message}`;
+        }
+      });
+    </script>
+  </body>
+</html>
