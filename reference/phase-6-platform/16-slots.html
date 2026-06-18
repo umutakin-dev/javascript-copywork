@@ -1,0 +1,42 @@
+<!doctype html>
+<!--
+  Phase 6 · 16 — Slots: project light-DOM content into the shadow tree
+  <slot> is a placeholder the element's own children fill. Default content shows
+  when nothing is slotted in.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_templates_and_slots
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Web Components: slots</title>
+  </head>
+  <body>
+    <info-card>
+      <span slot="title">Copywork</span>
+      <span>Type every program by hand.</span>
+    </info-card>
+
+    <info-card>
+      <!-- no slot="title" provided -> the default text shows -->
+      <span>Only a body here.</span>
+    </info-card>
+
+    <script type="module">
+      class InfoCard extends HTMLElement {
+        constructor() {
+          super();
+          this.attachShadow({ mode: "open" }).innerHTML = `
+            <style>
+              :host { display:block; border:1px solid #ccc; padding:.5rem; margin:.25rem 0; }
+              h3 { margin:.2rem 0; }
+            </style>
+            <h3><slot name="title">Untitled</slot></h3>
+            <div><slot>(no content)</slot></div>
+          `;
+        }
+      }
+      customElements.define("info-card", InfoCard);
+      console.log("named slot=title fills the heading; the default slot fills the body");
+    </script>
+  </body>
+</html>

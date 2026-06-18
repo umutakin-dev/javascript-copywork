@@ -1,0 +1,44 @@
+<!doctype html>
+<!--
+  Phase 6 · 06 — Event delegation: ONE listener for many children
+  Listen on the parent and use event.target.closest() to find which child fired.
+  Works for elements added LATER, and is cheaper than N separate listeners.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/Element/closest
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Events: delegation</title>
+  </head>
+  <body>
+    <ul id="todos">
+      <li>buy milk <button data-action="done">done</button></li>
+      <li>walk dog <button data-action="done">done</button></li>
+    </ul>
+    <button id="add">Add row</button>
+
+    <script type="module">
+      const list = document.querySelector("#todos");
+
+      // A SINGLE listener on the <ul> handles every button — present and future.
+      list.addEventListener("click", (event) => {
+        const btn = event.target.closest("button[data-action='done']");
+        if (!btn) return; // clicked elsewhere — ignore
+        const li = btn.closest("li");
+        li.style.textDecoration = "line-through";
+        console.log("completed:", li.firstChild.textContent.trim());
+      });
+
+      // New rows need NO new listener — delegation already covers them.
+      document.querySelector("#add").addEventListener("click", () => {
+        const li = document.createElement("li");
+        li.append("new task ");
+        const btn = document.createElement("button");
+        btn.dataset.action = "done";
+        btn.textContent = "done";
+        li.append(btn);
+        list.append(li);
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,130 @@
+<!doctype html>
+<!--
+  Project 03 — A tiny component library (Web Components, shadow DOM, slots)
+  Four reusable, encapsulated elements composed on the page. Each manages its own
+  markup, styles, and events, and talks out via CustomEvents.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/Web_components
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Project: Component library</title>
+    <style>body { font: 16px/1.5 system-ui; max-width: 32rem; margin: 2rem auto; }</style>
+  </head>
+  <body>
+    <h1>Component library</h1>
+
+    <ui-card>
+      <span slot="title">Counter</span>
+      <ui-counter start="3"></ui-counter>
+    </ui-card>
+
+    <ui-card>
+      <span slot="title">Toggle</span>
+      <ui-toggle></ui-toggle>
+    </ui-card>
+
+    <ui-card>
+      <span slot="title">Rating</span>
+      <ui-rating value="3"></ui-rating>
+    </ui-card>
+
+    <script type="module">
+      // <ui-card>: a titled container using a named slot + the default slot.
+      class UiCard extends HTMLElement {
+        constructor() {
+          super();
+          this.attachShadow({ mode: "open" }).innerHTML = `
+            <style>
+              :host { display:block; border:1px solid #ddd; border-radius:8px;
+                      padding:1rem; margin:.75rem 0; }
+              h3 { margin:0 0 .5rem; font-size:1rem; color:#555; }
+            </style>
+            <h3><slot name="title">Card</slot></h3>
+            <slot></slot>`;
+        }
+      }
+
+      // <ui-counter>: private state, +/- buttons, emits "change".
+      class UiCounter extends HTMLElement {
+        #n = 0;
+        connectedCallback() {
+          this.#n = Number(this.getAttribute("start") ?? 0);
+          this.attachShadow({ mode: "open" }).innerHTML =
+            `<style>button{font-size:1.1rem;width:2rem}</style>
+             <button id="d">−</button> <output></output> <button id="u">+</button>`;
+          this.shadowRoot.querySelector("#u").onclick = () => this.#set(this.#n + 1);
+          this.shadowRoot.querySelector("#d").onclick = () => this.#set(this.#n - 1);
+          this.#paint();
+        }
+        #set(v) {
+          this.#n = v;
+          this.#paint();
+          this.dispatchEvent(new CustomEvent("change", { detail: v, bubbles: true }));
+        }
+        #paint() {
+          this.shadowRoot.querySelector("output").textContent = ` ${this.#n} `;
+        }
+      }
+
+      // <ui-toggle>: an accessible on/off switch.
+      class UiToggle extends HTMLElement {
+        connectedCallback() {
+          this.attachShadow({ mode: "open" }).innerHTML = `
+            <style>
+              button { width:3rem; height:1.5rem; border-radius:1rem; border:none;
+                       background:#bbb; position:relative; cursor:pointer; }
+              button[aria-pressed="true"] { background:seagreen; }
+              span { position:absolute; top:2px; left:2px; width:1.1rem; height:1.1rem;
+                     background:#fff; border-radius:50%; transition:left .15s; }
+              button[aria-pressed="true"] span { left:1.65rem; }
+            </style>
+            <button aria-pressed="false"><span></span></button>`;
+          const btn = this.shadowRoot.querySelector("button");
+          btn.onclick = () => {
+            const on = btn.getAttribute("aria-pressed") === "true";
+            btn.setAttribute("aria-pressed", String(!on));
+            this.dispatchEvent(new CustomEvent("toggle", { detail: !on, bubbles: true }));
+          };
+        }
+      }
+
+      // <ui-rating>: clickable stars.
+      class UiRating extends HTMLElement {
+        connectedCallback() {
+          this.value = Number(this.getAttribute("value") ?? 0);
+          this.attachShadow({ mode: "open" }).innerHTML =
+            `<style>button{border:none;background:none;font-size:1.4rem;cursor:pointer;color:#f5b301}</style>
+             <span id="stars"></span>`;
+          this.shadowRoot.getElementById("stars").addEventListener("click", (e) => {
+            const star = e.target.closest("button[data-v]");
+            if (star) {
+              this.value = Number(star.dataset.v);
+              this.#paint();
+            }
+          });
+          this.#paint();
+        }
+        #paint() {
+          const stars = this.shadowRoot.getElementById("stars");
+          stars.replaceChildren();
+          for (let i = 1; i <= 5; i++) {
+            const b = document.createElement("button");
+            b.dataset.v = i;
+            b.textContent = i <= this.value ? "★" : "☆";
+            stars.append(b);
+          }
+        }
+      }
+
+      customElements.define("ui-card", UiCard);
+      customElements.define("ui-counter", UiCounter);
+      customElements.define("ui-toggle", UiToggle);
+      customElements.define("ui-rating", UiRating);
+
+      // Listen to every component's events from the top, thanks to bubbling:
+      document.addEventListener("change", (e) => console.log("counter:", e.detail));
+      document.addEventListener("toggle", (e) => console.log("toggle:", e.detail));
+    </script>
+  </body>
+</html>

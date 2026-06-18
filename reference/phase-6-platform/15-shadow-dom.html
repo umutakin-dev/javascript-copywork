@@ -1,0 +1,39 @@
+<!doctype html>
+<!--
+  Phase 6 · 15 — Shadow DOM: encapsulated markup AND styles
+  attachShadow gives the element a private subtree: styles inside don't leak out,
+  and the page's styles don't leak in.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_shadow_DOM
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Web Components: shadow DOM</title>
+    <style>
+      p { color: red; } /* page rule — must NOT reach the component's <p> */
+    </style>
+  </head>
+  <body>
+    <p>Page paragraph (red).</p>
+    <fancy-box></fancy-box>
+
+    <script type="module">
+      class FancyBox extends HTMLElement {
+        constructor() {
+          super();
+          const shadow = this.attachShadow({ mode: "open" });
+          // This <style> is SCOPED to the shadow tree; :host styles the element.
+          shadow.innerHTML = `
+            <style>
+              :host { display: block; border: 2px solid green; padding: .5rem; }
+              p { color: green; font-weight: bold; }
+            </style>
+            <p>Shadow paragraph (green) — the page's red rule can't reach me.</p>
+          `;
+        }
+      }
+      customElements.define("fancy-box", FancyBox);
+      console.log("component <p> stays green despite the page's red <p> rule");
+    </script>
+  </body>
+</html>

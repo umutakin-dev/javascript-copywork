@@ -1,0 +1,41 @@
+<!doctype html>
+<!--
+  Phase 6 · 03 — The <template> element + cloneNode(true)
+  <template> content is INERT (not rendered; images/scripts don't run) until you
+  clone it. The standard way to stamp out repeated markup.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>DOM: template + clone</title>
+  </head>
+  <body>
+    <template id="card">
+      <li class="card">
+        <strong class="name"></strong>
+        <span class="role"></span>
+      </li>
+    </template>
+
+    <ul id="list"></ul>
+
+    <script type="module">
+      const tmpl = document.querySelector("#card");
+      const list = document.querySelector("#list");
+      const people = [
+        { name: "Umut", role: "admin" },
+        { name: "Alice", role: "user" },
+      ];
+
+      for (const person of people) {
+        // Deep-clone the template's content (true = include descendants), then fill.
+        const node = tmpl.content.cloneNode(true);
+        node.querySelector(".name").textContent = person.name;
+        node.querySelector(".role").textContent = ` (${person.role})`;
+        list.append(node);
+      }
+      console.log("stamped", people.length, "cards from one <template>");
+    </script>
+  </body>
+</html>

@@ -1,0 +1,31 @@
+<!doctype html>
+<!--
+  Phase 0 · 02 — A served page (the #1 beginner trap)
+
+  ES modules do NOT load over file:// — you MUST serve this over http://.
+  From the project root:
+      bun serve.js
+  then open the printed URL + this path, e.g.
+      http://localhost:8000/reference/phase-0-env/02-served-page.html
+
+  Double-clicking the file (a file:// URL) will fail with a module/CORS error.
+
+  Ref: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Served page</title>
+  </head>
+  <body>
+    <h1 id="out">…</h1>
+
+    <!-- type="module": deferred, strict mode, own scope, and importable. -->
+    <script type="module">
+      // This runs in the BROWSER, so the DOM exists here (unlike the CLI).
+      const out = document.querySelector("#out");
+      out.textContent = "Hello from a module in a served page.";
+      console.log("Open devtools — this logged from a module.");
+    </script>
+  </body>
+</html>

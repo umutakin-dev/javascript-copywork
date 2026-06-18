@@ -1,0 +1,29 @@
+<!doctype html>
+<!--
+  Phase 6 · 13 — A custom element: class extends HTMLElement
+  customElements.define("x-y", Class) registers a new tag. The name MUST contain
+  a hyphen (so it can never clash with a future built-in element).
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_custom_elements
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Web Components: custom element</title>
+  </head>
+  <body>
+    <hello-world></hello-world>
+    <hello-world></hello-world>
+
+    <script type="module">
+      class HelloWorld extends HTMLElement {
+        connectedCallback() {
+          // Runs each time an instance is inserted into the document.
+          this.textContent = "Hello from a custom element!";
+          this.style.display = "block";
+        }
+      }
+      customElements.define("hello-world", HelloWorld); // hyphen required
+      console.log("defined <hello-world>");
+    </script>
+  </body>
+</html>

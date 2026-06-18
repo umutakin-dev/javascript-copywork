@@ -1,0 +1,40 @@
+<!doctype html>
+<!--
+  Phase 6 · 01 — Select, create, append, and remove DOM nodes
+  Serve the project, open this page, and watch BOTH the page and the console.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelector
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>DOM: select / create / remove</title>
+  </head>
+  <body>
+    <ul id="list">
+      <li>existing one</li>
+      <li>existing two</li>
+    </ul>
+    <button id="add">Add item</button>
+
+    <script type="module">
+      const list = document.querySelector("#list");
+      const addBtn = document.querySelector("#add");
+
+      // querySelectorAll returns a STATIC NodeList (a snapshot, not live):
+      console.log("items now:", document.querySelectorAll("#list li").length); // 2
+
+      let n = 0;
+      addBtn.addEventListener("click", () => {
+        const li = document.createElement("li"); // create
+        li.textContent = `added ${++n}`; // fill
+        list.append(li); // append() takes nodes OR strings (appendChild takes only nodes)
+      });
+
+      // After 1s, remove the first item to show node.remove():
+      setTimeout(() => {
+        list.querySelector("li")?.remove();
+        console.log("removed the first item");
+      }, 1000);
+    </script>
+  </body>
+</html>

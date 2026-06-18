@@ -1,0 +1,26 @@
+<!doctype html>
+<!--
+  Phase 6 · 21 — fetch POST with a JSON body and headers
+  Needs internet. jsonplaceholder echoes the "created" resource back with an id.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/Window/fetch#supplying_request_options
+-->
+<html lang="en">
+  <head><meta charset="utf-8" /><title>fetch POST</title></head>
+  <body>
+    <button id="send">Create post</button>
+    <pre id="out"></pre>
+    <script type="module">
+      const out = document.querySelector("#out");
+      document.querySelector("#send").addEventListener("click", async () => {
+        const res = await fetch("https://jsonplaceholder.typicode.com/posts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: "copywork", body: "hello", userId: 1 }),
+        });
+        const created = await res.json();
+        out.textContent = `status ${res.status}\n` + JSON.stringify(created, null, 2);
+        console.log("server assigned id:", created.id);
+      });
+    </script>
+  </body>
+</html>

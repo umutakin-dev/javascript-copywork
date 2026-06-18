@@ -1,0 +1,46 @@
+<!doctype html>
+<!--
+  Phase 6 · 25 — ReadableStream: read data in chunks
+  We build a stream by hand to see the reader loop; fetch(url).body is the SAME
+  interface, so the identical loop reads a network response chunk by chunk.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream
+-->
+<html lang="en">
+  <head><meta charset="utf-8" /><title>ReadableStream</title></head>
+  <body>
+    <pre id="out"></pre>
+    <script type="module">
+      const out = document.querySelector("#out");
+
+      // A stream that emits 5 chunks, one every 200ms, then closes.
+      const stream = new ReadableStream({
+        start(controller) {
+          let n = 0;
+          const id = setInterval(() => {
+            if (n >= 5) {
+              clearInterval(id);
+              controller.close(); // signal: no more data
+              return;
+            }
+            controller.enqueue(`chunk ${++n}\n`); // push a chunk to the reader
+          }, 200);
+        },
+      });
+
+      // Consumer side: pull chunks until done.
+      const reader = stream.getReader();
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        out.textContent += value;
+        console.log("got", JSON.stringify(value));
+      }
+      out.textContent += "(stream done)\n";
+
+      // Same pattern for the network:
+      //   const res = await fetch(url);
+      //   const reader = res.body.getReader();         // Uint8Array chunks
+      //   const text = new TextDecoder().decode(value); // bytes -> string
+    </script>
+  </body>
+</html>

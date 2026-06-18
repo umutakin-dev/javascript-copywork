@@ -1,0 +1,29 @@
+<!doctype html>
+<!--
+  Phase 6 · 30 — Web Worker: heavy computation off the main thread
+  The worker runs in PARALLEL; you talk to it with postMessage / "message" events.
+  Needs its sibling file 30-worker.js (served from the same folder).
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers
+-->
+<html lang="en">
+  <head><meta charset="utf-8" /><title>Web Worker</title></head>
+  <body>
+    <button id="go">Compute (off main thread)</button>
+    <p id="out">idle</p>
+    <script type="module">
+      const out = document.querySelector("#out");
+      // import.meta.url resolves the worker path relative to THIS module.
+      const worker = new Worker(new URL("./30-worker.js", import.meta.url), { type: "module" });
+
+      worker.addEventListener("message", (event) => {
+        out.textContent = `sum of primes < ${event.data.limit} = ${event.data.result}`;
+        console.log("worker replied:", event.data);
+      });
+
+      document.querySelector("#go").addEventListener("click", () => {
+        out.textContent = "working… (the UI stays responsive)";
+        worker.postMessage({ limit: 200000 }); // hand the job to the worker
+      });
+    </script>
+  </body>
+</html>

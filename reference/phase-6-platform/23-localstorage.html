@@ -1,0 +1,31 @@
+<!doctype html>
+<!--
+  Phase 6 · 23 — localStorage (persists across reloads; STORES STRINGS ONLY)
+  Store objects via JSON.stringify on write and JSON.parse on read.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage
+-->
+<html lang="en">
+  <head><meta charset="utf-8" /><title>localStorage</title></head>
+  <body>
+    <input id="name" placeholder="your name" />
+    <button id="save">Save</button>
+    <p id="out"></p>
+    <script type="module">
+      const KEY = "copywork:prefs";
+      const nameInput = document.querySelector("#name");
+      const out = document.querySelector("#out");
+
+      // Read with a default if nothing is stored yet, then JSON.parse to an object.
+      const prefs = JSON.parse(localStorage.getItem(KEY) ?? "{}");
+      nameInput.value = prefs.name ?? "";
+      out.textContent = prefs.name ? `welcome back, ${prefs.name}` : "no saved name yet";
+
+      document.querySelector("#save").addEventListener("click", () => {
+        const next = { name: nameInput.value, savedAt: new Date().toISOString() };
+        localStorage.setItem(KEY, JSON.stringify(next)); // must stringify
+        out.textContent = "saved — reload the page to see it persist";
+        console.log("stored:", next);
+      });
+    </script>
+  </body>
+</html>

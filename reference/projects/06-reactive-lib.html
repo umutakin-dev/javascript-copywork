@@ -1,0 +1,80 @@
+<!doctype html>
+<!--
+  Project 06 — A "reactive" micro-lib (Proxy observable wired to the DOM)
+  ~60 lines that demystify every framework: reactive() makes state observable;
+  effect() runs a function and AUTO-re-runs it whenever the reactive state it
+  read changes. We then wire effects to the DOM. This is the heart of Vue's
+  reactivity, in miniature.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Project: Reactive micro-lib</title>
+    <style>body { font: 16px/1.5 system-ui; max-width: 28rem; margin: 2rem auto; }</style>
+  </head>
+  <body>
+    <h1>Reactivity in ~60 lines</h1>
+    <input id="name" placeholder="your name" />
+    <button id="inc">+1</button>
+    <p id="out"></p>
+
+    <script type="module">
+      // ---------- the micro-lib ----------
+      let activeEffect = null; // the effect currently running
+      const depsMap = new WeakMap(); // target -> Map(key -> Set<effect>)
+
+      function track(target, key) {
+        if (!activeEffect) return;
+        let keys = depsMap.get(target);
+        if (!keys) depsMap.set(target, (keys = new Map()));
+        let effects = keys.get(key);
+        if (!effects) keys.set(key, (effects = new Set()));
+        effects.add(activeEffect); // record: this effect depends on target.key
+      }
+
+      function trigger(target, key) {
+        const effects = depsMap.get(target)?.get(key);
+        if (effects) for (const fn of [...effects]) fn(); // re-run dependents
+      }
+
+      function reactive(obj) {
+        return new Proxy(obj, {
+          get(t, key, recv) {
+            track(t, key); // the active effect just read this key
+            return Reflect.get(t, key, recv);
+          },
+          set(t, key, value, recv) {
+            const ok = Reflect.set(t, key, value, recv);
+            trigger(t, key); // notify everything that read this key
+            return ok;
+          },
+        });
+      }
+
+      function effect(fn) {
+        activeEffect = fn;
+        fn(); // first run records dependencies via the get trap
+        activeEffect = null;
+      }
+
+      // ---------- using it ----------
+      const state = reactive({ name: "", count: 0 });
+      const out = document.querySelector("#out");
+
+      // This effect reads state.name and state.count, so it re-runs whenever
+      // EITHER changes — no manual subscription, no framework.
+      effect(() => {
+        out.textContent = `Hello ${state.name || "stranger"} — clicked ${state.count}×`;
+      });
+
+      // Wire DOM inputs INTO the reactive state:
+      document.querySelector("#name").addEventListener("input", (e) => {
+        state.name = e.target.value; // triggers the effect
+      });
+      document.querySelector("#inc").addEventListener("click", () => {
+        state.count++; // also triggers the effect
+      });
+    </script>
+  </body>
+</html>

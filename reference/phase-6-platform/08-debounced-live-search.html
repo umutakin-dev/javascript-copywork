@@ -1,0 +1,48 @@
+<!doctype html>
+<!--
+  Phase 6 · 08 — Live search with your Phase 2 debounce
+  Debounce keeps "search as you type" from firing on every keystroke.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Events: debounced live search</title>
+  </head>
+  <body>
+    <input id="search" placeholder="search fruits…" />
+    <ul id="results"></ul>
+
+    <script type="module">
+      // Same debounce you reimplemented in Phase 2 · 14.
+      function debounce(fn, ms) {
+        let timer;
+        return (...args) => {
+          clearTimeout(timer);
+          timer = setTimeout(() => fn(...args), ms);
+        };
+      }
+
+      const fruits = ["apple", "apricot", "banana", "cherry", "grape", "mango"];
+      const input = document.querySelector("#search");
+      const results = document.querySelector("#results");
+
+      function render(query) {
+        const matches = fruits.filter((f) => f.includes(query.toLowerCase()));
+        results.replaceChildren(); // clear previous results in one call
+        for (const f of matches) {
+          const li = document.createElement("li");
+          li.textContent = f;
+          results.append(li);
+        }
+        console.log(`searched "${query}" -> ${matches.length} hits`);
+      }
+
+      // render runs only 250ms AFTER the user stops typing:
+      input.addEventListener(
+        "input",
+        debounce((event) => render(event.target.value), 250),
+      );
+    </script>
+  </body>
+</html>

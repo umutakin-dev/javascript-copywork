@@ -1,0 +1,32 @@
+<!doctype html>
+<!--
+  Phase 6 · 12 — Accordion with <details>/<summary> (works with zero JS)
+  The disclosure widget is built in. A shared name="" already makes it exclusive
+  in modern browsers; the JS below logs and is a fallback for older ones.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/details
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Built-in: details accordion</title>
+  </head>
+  <body>
+    <div id="acc">
+      <details name="faq"><summary>What is copywork?</summary><p>Retyping code by hand.</p></details>
+      <details name="faq"><summary>Why no frameworks?</summary><p>Learn the platform.</p></details>
+      <details name="faq"><summary>Which runtime?</summary><p>Bun, Node, or Deno.</p></details>
+    </div>
+
+    <script type="module">
+      const panels = document.querySelectorAll("#acc details");
+      for (const panel of panels) {
+        // "toggle" fires whenever a panel opens or closes.
+        panel.addEventListener("toggle", () => {
+          if (!panel.open) return;
+          console.log("opened:", panel.querySelector("summary").textContent);
+          for (const other of panels) if (other !== panel) other.open = false;
+        });
+      }
+    </script>
+  </body>
+</html>

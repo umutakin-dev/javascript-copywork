@@ -1,0 +1,72 @@
+<!doctype html>
+<!--
+  Phase 6 · 33 — WebGPU hello-triangle  (STRETCH — verify support)
+  Support: navigator.gpu exists in Chrome/Edge today; Firefox/Safari are rolling
+  it out. If it's missing, the page shows a message instead of crashing.
+  This is the canonical minimal render pipeline; the shader language is WGSL.
+  (Ties into your WGSL work — the triangle is the "hello world" of GPU APIs.)
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API
+-->
+<html lang="en">
+  <head><meta charset="utf-8" /><title>WebGPU triangle</title></head>
+  <body>
+    <canvas id="c" width="320" height="240"></canvas>
+    <p id="msg"></p>
+    <script type="module">
+      const msg = document.querySelector("#msg");
+
+      if (!navigator.gpu) {
+        msg.textContent = "WebGPU is not available in this browser.";
+      } else {
+        const adapter = await navigator.gpu.requestAdapter();
+        const device = await adapter.requestDevice();
+        const ctx = document.querySelector("#c").getContext("webgpu");
+        const format = navigator.gpu.getPreferredCanvasFormat();
+        ctx.configure({ device, format, alphaMode: "opaque" });
+
+        // WGSL: vertex shader emits 3 hard-coded points; fragment shader is red.
+        const shader = device.createShaderModule({
+          code: `
+            @vertex
+            fn vs(@builtin(vertex_index) i : u32) -> @builtin(position) vec4f {
+              var p = array<vec2f, 3>(
+                vec2f( 0.0,  0.5),
+                vec2f(-0.5, -0.5),
+                vec2f( 0.5, -0.5),
+              );
+              return vec4f(p[i], 0.0, 1.0);
+            }
+            @fragment
+            fn fs() -> @location(0) vec4f {
+              return vec4f(1.0, 0.2, 0.2, 1.0);
+            }
+          `,
+        });
+
+        const pipeline = device.createRenderPipeline({
+          layout: "auto",
+          vertex: { module: shader, entryPoint: "vs" },
+          fragment: { module: shader, entryPoint: "fs", targets: [{ format }] },
+          primitive: { topology: "triangle-list" },
+        });
+
+        const encoder = device.createCommandEncoder();
+        const pass = encoder.beginRenderPass({
+          colorAttachments: [
+            {
+              view: ctx.getCurrentTexture().createView(),
+              clearValue: { r: 0.1, g: 0.1, b: 0.12, a: 1 },
+              loadOp: "clear",
+              storeOp: "store",
+            },
+          ],
+        });
+        pass.setPipeline(pipeline);
+        pass.draw(3); // 3 vertices -> one triangle
+        pass.end();
+        device.queue.submit([encoder.finish()]);
+        msg.textContent = "drew a triangle with WebGPU 🎉";
+      }
+    </script>
+  </body>
+</html>

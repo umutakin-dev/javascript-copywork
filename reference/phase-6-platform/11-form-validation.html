@@ -1,0 +1,47 @@
+<!doctype html>
+<!--
+  Phase 6 · 11 — Native form validation (required, pattern, setCustomValidity)
+  The browser validates for free; setCustomValidity adds your own cross-field rule.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/setCustomValidity
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Built-in: validation</title>
+  </head>
+  <body>
+    <form id="form">
+      <input id="user" name="user" required pattern="[a-z]{3,}" placeholder="lowercase, 3+" />
+      <input id="pw" name="pw" type="password" required placeholder="password" />
+      <input id="pw2" name="pw2" type="password" required placeholder="confirm" />
+      <button>Sign up</button>
+    </form>
+    <output id="out"></output>
+
+    <script type="module">
+      const form = document.querySelector("#form");
+      const pw = document.querySelector("#pw");
+      const pw2 = document.querySelector("#pw2");
+      const out = document.querySelector("#out");
+
+      // Custom rule: the two passwords must match. A non-empty message marks the
+      // field invalid; clearing it ("") marks it valid again.
+      function checkMatch() {
+        pw2.setCustomValidity(pw2.value === pw.value ? "" : "passwords do not match");
+      }
+      pw.addEventListener("input", checkMatch);
+      pw2.addEventListener("input", checkMatch);
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault(); // (demo) never actually navigate
+        // checkValidity() runs required + pattern + custom checks together.
+        if (!form.checkValidity()) {
+          form.reportValidity(); // show the native error bubbles
+          out.textContent = "fix the errors above";
+          return;
+        }
+        out.textContent = "valid! (would submit now)";
+      });
+    </script>
+  </body>
+</html>

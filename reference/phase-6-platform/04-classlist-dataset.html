@@ -1,0 +1,38 @@
+<!doctype html>
+<!--
+  Phase 6 · 04 — classList and dataset (data-* attributes)
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/Element/classList
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>DOM: classList + dataset</title>
+    <style>
+      .box { padding: 1rem; border: 1px solid #999; }
+      .active { background: gold; }
+    </style>
+  </head>
+  <body>
+    <div id="box" class="box" data-user-id="42" data-role="admin">A box</div>
+    <button id="toggle">Toggle active</button>
+
+    <script type="module">
+      const box = document.querySelector("#box");
+
+      // classList: add / remove / toggle / contains — no manual string parsing.
+      box.classList.add("active");
+      console.log("has active?", box.classList.contains("active")); // true
+
+      document.querySelector("#toggle").addEventListener("click", () => {
+        const on = box.classList.toggle("active"); // toggle returns the new state
+        console.log("active is now", on);
+      });
+
+      // dataset: data-user-id  <->  dataset.userId  (kebab-case <-> camelCase)
+      console.log("user id:", box.dataset.userId); // "42"  (always a string)
+      console.log("role:", box.dataset.role); // "admin"
+      box.dataset.role = "viewer"; // writes back to the data-role attribute
+      console.log("attr now:", box.getAttribute("data-role")); // "viewer"
+    </script>
+  </body>
+</html>

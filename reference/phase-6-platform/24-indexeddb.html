@@ -1,0 +1,58 @@
+<!doctype html>
+<!--
+  Phase 6 · 24 — IndexedDB: a real client-side database (verbose but pure standard)
+  Event-based API: open -> onupgradeneeded creates stores -> transactions read/write.
+  We wrap each request in a promise so we can use async/await.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Using_IndexedDB
+-->
+<html lang="en">
+  <head><meta charset="utf-8" /><title>IndexedDB</title></head>
+  <body>
+    <button id="add">Add note</button>
+    <ul id="list"></ul>
+    <script type="module">
+      // Turn a request's onsuccess/onerror events into a promise.
+      const promisify = (request) =>
+        new Promise((resolve, reject) => {
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+
+      function openDb() {
+        const req = indexedDB.open("copywork", 1);
+        req.onupgradeneeded = () => {
+          // Schema changes happen ONLY here (on a version bump).
+          req.result.createObjectStore("notes", { keyPath: "id", autoIncrement: true });
+        };
+        return promisify(req);
+      }
+
+      const db = await openDb();
+
+      async function addNote(text) {
+        const tx = db.transaction("notes", "readwrite");
+        await promisify(tx.objectStore("notes").add({ text, at: Date.now() }));
+      }
+      async function allNotes() {
+        const tx = db.transaction("notes", "readonly");
+        return promisify(tx.objectStore("notes").getAll());
+      }
+
+      async function render() {
+        const list = document.querySelector("#list");
+        list.replaceChildren();
+        for (const note of await allNotes()) {
+          const li = document.createElement("li");
+          li.textContent = `#${note.id}: ${note.text}`;
+          list.append(li);
+        }
+      }
+
+      document.querySelector("#add").addEventListener("click", async () => {
+        await addNote(`note created at ${new Date().toLocaleTimeString()}`);
+        await render();
+      });
+      await render(); // show existing notes on load (they persist across reloads)
+    </script>
+  </body>
+</html>

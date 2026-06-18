@@ -1,0 +1,41 @@
+<!doctype html>
+<!--
+  Phase 6 · 31 — Canvas 2D: the drawing primitives
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D
+-->
+<html lang="en">
+  <head><meta charset="utf-8" /><title>Canvas 2D</title></head>
+  <body>
+    <canvas id="c" width="320" height="200" style="border:1px solid #999"></canvas>
+    <script type="module">
+      const ctx = document.querySelector("#c").getContext("2d");
+
+      // Filled rectangle
+      ctx.fillStyle = "steelblue";
+      ctx.fillRect(20, 20, 100, 60);
+
+      // Stroked path (a triangle): moveTo, lineTo, closePath, stroke
+      ctx.beginPath();
+      ctx.moveTo(160, 20);
+      ctx.lineTo(240, 90);
+      ctx.lineTo(160, 90);
+      ctx.closePath();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "tomato";
+      ctx.stroke();
+
+      // Circle via arc(), then filled
+      ctx.beginPath();
+      ctx.arc(90, 150, 35, 0, Math.PI * 2);
+      ctx.fillStyle = "gold";
+      ctx.fill();
+
+      // Text
+      ctx.fillStyle = "#222";
+      ctx.font = "16px sans-serif";
+      ctx.fillText("Canvas 2D", 160, 150);
+
+      console.log("drew rect, triangle, circle, and text");
+    </script>
+  </body>
+</html>

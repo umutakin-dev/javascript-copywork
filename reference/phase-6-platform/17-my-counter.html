@@ -1,0 +1,47 @@
+<!doctype html>
+<!--
+  Phase 6 · 17 — <my-counter>: a real, self-contained component
+  Private state (#count) + shadow DOM + its own listeners + a CustomEvent out.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/Web_components
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Web Components: my-counter</title>
+  </head>
+  <body>
+    <my-counter></my-counter>
+    <my-counter start="10"></my-counter>
+
+    <script type="module">
+      class MyCounter extends HTMLElement {
+        #count = 0;
+
+        connectedCallback() {
+          this.#count = Number(this.getAttribute("start") ?? 0);
+          this.attachShadow({ mode: "open" }).innerHTML = `
+            <style>button,output{font-size:1.2rem;margin:.2rem;}</style>
+            <button id="dec">−</button>
+            <output id="val"></output>
+            <button id="inc">+</button>
+          `;
+          this.shadowRoot.getElementById("inc").addEventListener("click", () => this.#update(1));
+          this.shadowRoot.getElementById("dec").addEventListener("click", () => this.#update(-1));
+          this.#render();
+        }
+        #update(delta) {
+          this.#count += delta;
+          this.#render();
+          // Notify the outside world the standard way: a bubbling CustomEvent.
+          this.dispatchEvent(new CustomEvent("change", { detail: this.#count, bubbles: true }));
+        }
+        #render() {
+          this.shadowRoot.getElementById("val").textContent = ` ${this.#count} `;
+        }
+      }
+      customElements.define("my-counter", MyCounter);
+
+      document.addEventListener("change", (event) => console.log("counter changed:", event.detail));
+    </script>
+  </body>
+</html>

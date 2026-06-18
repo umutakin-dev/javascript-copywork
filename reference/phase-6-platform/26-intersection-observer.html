@@ -1,0 +1,41 @@
+<!doctype html>
+<!--
+  Phase 6 · 26 — IntersectionObserver: react when an element enters the viewport
+  The efficient way to do lazy-loading, infinite scroll, and "is it visible?".
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/IntersectionObserver
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>IntersectionObserver</title>
+    <style>
+      .spacer { height: 150vh; background: #f3f3f3; }
+      .target { height: 100px; background: gold; display: grid; place-items: center; }
+      .seen { background: limegreen; }
+    </style>
+  </head>
+  <body>
+    <p>Scroll down…</p>
+    <div class="spacer"></div>
+    <div id="target" class="target">watch me</div>
+    <div class="spacer"></div>
+
+    <script type="module">
+      const target = document.querySelector("#target");
+      const observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              target.classList.add("seen");
+              target.textContent = "I'm on screen!";
+              console.log("visible, ratio:", entry.intersectionRatio);
+              observer.unobserve(target); // fire once, then stop watching
+            }
+          }
+        },
+        { threshold: 0.5 }, // callback once 50% of the element is visible
+      );
+      observer.observe(target);
+    </script>
+  </body>
+</html>

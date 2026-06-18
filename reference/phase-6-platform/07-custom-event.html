@@ -1,0 +1,39 @@
+<!doctype html>
+<!--
+  Phase 6 · 07 — CustomEvent: your own events with a detail payload
+  Decouples parts of an app: one piece dispatches, another listens — no direct call.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/CustomEvent
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Events: CustomEvent</title>
+  </head>
+  <body>
+    <button id="buy">Buy</button>
+    <output id="cart">cart: 0</output>
+
+    <script type="module">
+      const buy = document.querySelector("#buy");
+      const cart = document.querySelector("#cart");
+      let count = 0;
+
+      // Listen for a custom "cart:add" event wherever it bubbles to (document).
+      document.addEventListener("cart:add", (event) => {
+        count += event.detail.qty; // read the payload from event.detail
+        cart.textContent = `cart: ${count}`;
+        console.log("added", event.detail);
+      });
+
+      buy.addEventListener("click", () => {
+        // Dispatch with a detail payload; bubbles:true lets it reach document.
+        buy.dispatchEvent(
+          new CustomEvent("cart:add", {
+            detail: { sku: "ABC", qty: 1 },
+            bubbles: true,
+          }),
+        );
+      });
+    </script>
+  </body>
+</html>

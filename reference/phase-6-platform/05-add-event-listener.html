@@ -1,0 +1,41 @@
+<!doctype html>
+<!--
+  Phase 6 · 05 — addEventListener: click, input, submit (preventDefault)
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Events: basics</title>
+  </head>
+  <body>
+    <button id="btn">Click me</button>
+    <input id="field" placeholder="type here" />
+    <form id="form">
+      <input name="q" placeholder="search" />
+      <button>Submit</button>
+    </form>
+    <output id="out"></output>
+
+    <script type="module">
+      const out = document.querySelector("#out");
+      const show = (msg) => (out.textContent = msg);
+
+      document.querySelector("#btn").addEventListener("click", (event) => {
+        show(`clicked at ${event.clientX},${event.clientY}`);
+      });
+
+      // "input" fires on every keystroke; event.target is the element.
+      document.querySelector("#field").addEventListener("input", (event) => {
+        show(`typed: ${event.target.value}`);
+      });
+
+      // A form submit would RELOAD the page by default — preventDefault stops it.
+      document.querySelector("#form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        const value = event.target.elements.q.value;
+        show(`submitted: ${value} (no reload)`);
+      });
+    </script>
+  </body>
+</html>

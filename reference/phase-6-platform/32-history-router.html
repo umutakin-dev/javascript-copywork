@@ -1,0 +1,52 @@
+<!doctype html>
+<!--
+  Phase 6 · 32 — A tiny client-side router (History API), no framework
+  pushState changes the URL WITHOUT reloading; popstate fires on back/forward.
+  This is the whole idea behind every "SPA router", in ~40 lines.
+  NOTE: reloading a pushed path (e.g. /about) 404s unless the server rewrites to
+  this file — that's the well-known SPA "deep link" caveat.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/History/pushState
+-->
+<html lang="en">
+  <head><meta charset="utf-8" /><title>History router</title></head>
+  <body>
+    <nav>
+      <a href="/" data-link>Home</a> |
+      <a href="/about" data-link>About</a> |
+      <a href="/contact" data-link>Contact</a>
+    </nav>
+    <main id="view"></main>
+
+    <script type="module">
+      const routes = {
+        "/": "🏠 Home — welcome.",
+        "/about": "ℹ️ About — the copywork curriculum.",
+        "/contact": "✉️ Contact — umut@example.com.",
+      };
+      const view = document.querySelector("#view");
+
+      function render(path) {
+        view.textContent = routes[path] ?? `404 — no route for ${path}`;
+        console.log("rendered", path);
+      }
+
+      function navigate(path) {
+        history.pushState({}, "", path); // change the URL, no page reload
+        render(path);
+      }
+
+      // Intercept in-app link clicks instead of letting the browser navigate:
+      document.addEventListener("click", (event) => {
+        const link = event.target.closest("a[data-link]");
+        if (!link) return;
+        event.preventDefault();
+        navigate(new URL(link.href).pathname);
+      });
+
+      // Back / forward buttons:
+      window.addEventListener("popstate", () => render(location.pathname));
+
+      render(location.pathname); // initial render
+    </script>
+  </body>
+</html>

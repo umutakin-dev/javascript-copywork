@@ -1,0 +1,36 @@
+<!doctype html>
+<!--
+  Phase 6 · 27 — MutationObserver: react to DOM changes
+  Watch a subtree for added/removed nodes or attribute changes.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver
+-->
+<html lang="en">
+  <head><meta charset="utf-8" /><title>MutationObserver</title></head>
+  <body>
+    <ul id="list"><li>first</li></ul>
+    <button id="add">Add item</button>
+    <p id="log"></p>
+
+    <script type="module">
+      const list = document.querySelector("#list");
+      const log = document.querySelector("#log");
+
+      const observer = new MutationObserver((records) => {
+        for (const record of records) {
+          if (record.type === "childList") {
+            log.textContent = `+${record.addedNodes.length} / -${record.removedNodes.length} nodes`;
+            console.log("mutation:", record.addedNodes);
+          }
+        }
+      });
+      observer.observe(list, { childList: true }); // watch direct children
+
+      let n = 1;
+      document.querySelector("#add").addEventListener("click", () => {
+        const li = document.createElement("li");
+        li.textContent = `item ${++n}`;
+        list.append(li); // the observer fires asynchronously after this
+      });
+    </script>
+  </body>
+</html>

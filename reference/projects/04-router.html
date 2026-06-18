@@ -1,0 +1,71 @@
+<!doctype html>
+<!--
+  Project 04 — Mini client-side router (History API, no dependencies)
+  A route table with a dynamic :param, active-link highlighting, and a 404.
+  NOTE: reloading a pushed path needs a server rewrite back to this file (the
+  classic SPA deep-link caveat).
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/History/pushState
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Project: Router</title>
+    <style>
+      body { font: 16px/1.5 system-ui; max-width: 32rem; margin: 2rem auto; }
+      nav a { margin-right: .75rem; }
+      nav a.active { font-weight: bold; text-decoration: underline; }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="/" data-link>Home</a>
+      <a href="/about" data-link>About</a>
+      <a href="/users/7" data-link>User 7</a>
+      <a href="/nope" data-link>Broken link</a>
+    </nav>
+    <main id="view"></main>
+
+    <script type="module">
+      // Each route: a RegExp (with optional named groups) -> a render function.
+      const routes = [
+        [/^\/$/, () => "🏠 Home"],
+        [/^\/about$/, () => "ℹ️ About this router"],
+        [/^\/users\/(?<id>\d+)$/, (m) => `👤 User #${m.groups.id}`],
+      ];
+      const view = document.querySelector("#view");
+
+      function render(path) {
+        for (const [pattern, fn] of routes) {
+          const match = pattern.exec(path);
+          if (match) {
+            view.textContent = fn(match);
+            return highlight(path);
+          }
+        }
+        view.textContent = `404 — no route for ${path}`;
+        highlight(path);
+      }
+
+      function highlight(path) {
+        for (const a of document.querySelectorAll("nav a[data-link]")) {
+          a.classList.toggle("active", new URL(a.href).pathname === path);
+        }
+      }
+
+      function navigate(path) {
+        history.pushState({}, "", path); // change URL, no reload
+        render(path);
+      }
+
+      document.addEventListener("click", (e) => {
+        const link = e.target.closest("a[data-link]");
+        if (!link) return;
+        e.preventDefault();
+        navigate(new URL(link.href).pathname);
+      });
+      window.addEventListener("popstate", () => render(location.pathname));
+
+      render(location.pathname);
+    </script>
+  </body>
+</html>

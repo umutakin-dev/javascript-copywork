@@ -1,0 +1,29 @@
+<!doctype html>
+<!--
+  Phase 6 · 20 — fetch GET + JSON, with error handling
+  Needs internet (uses jsonplaceholder.typicode.com). KEY GOTCHA: fetch only
+  REJECTS on a network failure — a 404/500 still RESOLVES, so check res.ok.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/Window/fetch
+-->
+<html lang="en">
+  <head><meta charset="utf-8" /><title>fetch GET</title></head>
+  <body>
+    <pre id="out">loading…</pre>
+    <script type="module">
+      const out = document.querySelector("#out");
+      async function load() {
+        try {
+          const res = await fetch("https://jsonplaceholder.typicode.com/todos/1");
+          if (!res.ok) throw new Error(`HTTP ${res.status}`); // 4xx/5xx don't reject
+          const todo = await res.json();
+          out.textContent = JSON.stringify(todo, null, 2);
+          console.log("loaded:", todo.title);
+        } catch (error) {
+          out.textContent = "failed: " + error.message; // network errors land here
+          console.error(error);
+        }
+      }
+      load();
+    </script>
+  </body>
+</html>

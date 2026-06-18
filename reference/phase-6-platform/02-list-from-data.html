@@ -1,0 +1,38 @@
+<!doctype html>
+<!--
+  Phase 6 · 02 — Build a list from data WITHOUT innerHTML string concat
+  createElement + textContent treats values as TEXT, so user data can never turn
+  into live HTML (this is your baseline defense against XSS).
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>DOM: list from data</title>
+  </head>
+  <body>
+    <ul id="people"></ul>
+
+    <script type="module">
+      const people = [
+        { name: "Umut", role: "admin" },
+        { name: "Alice <b>not bold</b>", role: "user" }, // HTML-looking on purpose
+        { name: "Bob", role: "user" },
+      ];
+
+      const ul = document.querySelector("#people");
+
+      // A DocumentFragment batches the inserts, so the live DOM is touched once.
+      const frag = document.createDocumentFragment();
+      for (const person of people) {
+        const li = document.createElement("li");
+        // The "<b>" shows as literal text — NOT bold — proving no HTML injection.
+        li.textContent = `${person.name} — ${person.role}`;
+        frag.append(li);
+      }
+      ul.append(frag);
+
+      console.log("rendered", people.length, "people safely (no HTML injection)");
+    </script>
+  </body>
+</html>

@@ -1,0 +1,13 @@
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs / temp
+*.log
+
+# Dependencies (none committed — there's no package.json — but just in case)
+node_modules/
+
+# Local IndexedDB / runtime scratch, if any tool writes it
+.cache/

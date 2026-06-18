@@ -1,0 +1,33 @@
+<!doctype html>
+<!--
+  Phase 6 · 22 — URL and URLSearchParams (no network)
+  Parse, read, and mutate URLs without any string hacking.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/URL
+-->
+<html lang="en">
+  <head><meta charset="utf-8" /><title>URL / URLSearchParams</title></head>
+  <body>
+    <pre id="out"></pre>
+    <script type="module">
+      const out = document.querySelector("#out");
+      const log = (...a) => (out.textContent += a.join(" ") + "\n");
+
+      const url = new URL("https://example.com/search?q=js&page=2#results");
+      log("origin:", url.origin); // https://example.com
+      log("pathname:", url.pathname); // /search
+      log("hash:", url.hash); // #results
+      log("q:", url.searchParams.get("q")); // js
+      log("page:", url.searchParams.get("page")); // 2
+
+      // Mutate the query, then read the whole URL back via .href:
+      url.searchParams.set("page", "3");
+      url.searchParams.append("tag", "copywork");
+      url.searchParams.delete("q");
+      log("rebuilt:", url.href);
+
+      // URLSearchParams stand-alone (build a query from an object):
+      const params = new URLSearchParams({ a: "1", b: "two" });
+      log("params:", params.toString()); // a=1&b=two
+    </script>
+  </body>
+</html>

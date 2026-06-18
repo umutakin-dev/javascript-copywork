@@ -1,0 +1,53 @@
+<!doctype html>
+<!--
+  Phase 6 · 18 — <my-tabs>: a tab strip built from slotted panels
+  Reads its child <section data-tab="..."> panels and renders a button bar that
+  shows one panel at a time.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/Web_components
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Web Components: my-tabs</title>
+  </head>
+  <body>
+    <my-tabs>
+      <section data-tab="One">First panel content.</section>
+      <section data-tab="Two">Second panel content.</section>
+      <section data-tab="Three">Third panel content.</section>
+    </my-tabs>
+
+    <script type="module">
+      class MyTabs extends HTMLElement {
+        connectedCallback() {
+          this.panels = [...this.querySelectorAll("section[data-tab]")];
+          const shadow = this.attachShadow({ mode: "open" });
+          shadow.innerHTML = `
+            <style>
+              nav { display:flex; gap:.25rem; }
+              button { padding:.3rem .6rem; }
+              button[aria-selected="true"] { font-weight:bold; border-bottom:2px solid; }
+            </style>
+            <nav></nav>
+            <slot></slot>
+          `;
+          const nav = shadow.querySelector("nav");
+
+          this.panels.forEach((panel, i) => {
+            const btn = document.createElement("button");
+            btn.textContent = panel.dataset.tab;
+            btn.addEventListener("click", () => this.select(i));
+            nav.append(btn);
+          });
+          this.buttons = [...nav.children];
+          this.select(0);
+        }
+        select(index) {
+          this.panels.forEach((panel, i) => (panel.hidden = i !== index));
+          this.buttons.forEach((btn, i) => btn.setAttribute("aria-selected", String(i === index)));
+        }
+      }
+      customElements.define("my-tabs", MyTabs);
+    </script>
+  </body>
+</html>

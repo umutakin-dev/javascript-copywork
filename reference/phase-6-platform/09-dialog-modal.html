@@ -1,0 +1,39 @@
+<!doctype html>
+<!--
+  Phase 6 · 09 — Native <dialog> modal (no library)
+  showModal() gives you a true modal for free: focus trap, ::backdrop, Esc-to-close.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/dialog
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Built-in: dialog</title>
+  </head>
+  <body>
+    <button id="open">Open dialog</button>
+
+    <dialog id="dlg">
+      <form method="dialog">
+        <p>Delete this item?</p>
+        <button value="cancel">Cancel</button>
+        <button value="confirm">Confirm</button>
+      </form>
+    </dialog>
+
+    <output id="result"></output>
+
+    <script type="module">
+      const dlg = document.querySelector("#dlg");
+      const result = document.querySelector("#result");
+
+      document.querySelector("#open").addEventListener("click", () => dlg.showModal());
+
+      // A <form method="dialog"> closes the dialog and sets returnValue to the
+      // pressed button's value — no preventDefault required.
+      dlg.addEventListener("close", () => {
+        result.textContent = `you chose: ${dlg.returnValue}`;
+        console.log("dialog closed with", dlg.returnValue);
+      });
+    </script>
+  </body>
+</html>

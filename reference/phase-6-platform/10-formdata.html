@@ -1,0 +1,39 @@
+<!doctype html>
+<!--
+  Phase 6 · 10 — FormData and URLSearchParams
+  FormData reads a whole form at once; URLSearchParams builds a query string.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/FormData
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Built-in: FormData</title>
+  </head>
+  <body>
+    <form id="form">
+      <input name="name" value="Umut" />
+      <input name="email" value="umut@example.com" />
+      <label><input type="checkbox" name="news" checked /> newsletter</label>
+      <button>Submit</button>
+    </form>
+    <output id="out"></output>
+
+    <script type="module">
+      const form = document.querySelector("#form");
+      const out = document.querySelector("#out");
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+
+        const data = new FormData(form);
+        const asObject = Object.fromEntries(data); // [name,value] entries -> object
+        console.log("as object:", asObject);
+
+        // FormData is an iterable of pairs, so URLSearchParams accepts it directly:
+        const params = new URLSearchParams(data);
+        out.textContent = params.toString();
+        console.log("query:", params.toString()); // name=Umut&email=...&news=on
+      });
+    </script>
+  </body>
+</html>

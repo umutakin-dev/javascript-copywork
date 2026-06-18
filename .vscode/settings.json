@@ -1,0 +1,56 @@
+{
+  // ============================================================
+  // COPYWORK MODE — make every keystroke yours.
+  // The point of this project is to type each program by hand.
+  // Anything that types FOR you is disabled below.
+  // Re-enable individual lines anytime if one gets in your way.
+  // ============================================================
+
+  // --- Autocomplete / suggestions: OFF ---
+  "editor.quickSuggestions": { "other": "off", "comments": "off", "strings": "off" },
+  "editor.suggestOnTriggerCharacters": false,
+  "editor.acceptSuggestionOnEnter": "off",
+  "editor.acceptSuggestionOnCommitCharacter": false,
+  "editor.tabCompletion": "off",
+  "editor.wordBasedSuggestions": "off",
+  "editor.parameterHints.enabled": false,
+  "editor.suggest.showWords": false,
+  "editor.snippetSuggestions": "none",
+
+  // --- Inline AI (Copilot etc.): OFF ---
+  "editor.inlineSuggest.enabled": false,
+  "github.copilot.enable": { "*": false },
+
+  // --- Auto-close / auto-surround: OFF (type your own brackets and quotes) ---
+  // This is the most aggressive setting here. If typing every closing
+  // bracket annoys you, flip these back to "languageDefined"/true.
+  "editor.autoClosingBrackets": "never",
+  "editor.autoClosingQuotes": "never",
+  "editor.autoSurround": "never",
+  "editor.autoClosingDelete": "never",
+  "editor.autoClosingOvertype": "never",
+
+  // --- Auto-import / language suggestions: OFF ---
+  "javascript.suggest.enabled": false,
+  "javascript.suggest.autoImports": false,
+  "typescript.suggest.autoImports": false,
+  "javascript.updateImportsOnFileMove.enabled": "never",
+
+  // --- Formatting & lint auto-fix: OFF (see your OWN mistakes) ---
+  // Your real self-check is `diff`-ing your practice file against the
+  // reference listing, not a formatter quietly fixing things.
+  "editor.formatOnSave": false,
+  "editor.formatOnPaste": false,
+  "editor.formatOnType": false,
+  "editor.codeActionsOnSave": {},
+  "eslint.enable": false,
+
+  // --- Indentation aids that HELP copywork stay ON ---
+  // JS convention is 2 spaces. Render whitespace so you can SEE indentation.
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "editor.detectIndentation": false,
+  "editor.renderWhitespace": "boundary",
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true
+}

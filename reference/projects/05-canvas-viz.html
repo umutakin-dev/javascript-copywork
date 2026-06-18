@@ -1,0 +1,72 @@
+<!doctype html>
+<!--
+  Project 05 — Canvas data viz (read data, draw, animate)
+  An animated bar chart: bars EASE toward their target height with
+  requestAnimationFrame; "Shuffle" re-randomizes the data and re-animates.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Project: Canvas viz</title>
+    <style>body { font: 16px/1.5 system-ui; max-width: 34rem; margin: 2rem auto; }</style>
+  </head>
+  <body>
+    <h1>Animated bar chart</h1>
+    <canvas id="c" width="480" height="240" style="border:1px solid #ccc"></canvas>
+    <p><button id="shuffle">Shuffle data</button></p>
+
+    <script type="module">
+      const ctx = document.querySelector("#c").getContext("2d");
+      const W = ctx.canvas.width;
+      const H = ctx.canvas.height;
+      const PAD = 24;
+
+      // "data": label + value. (Imagine this came from fetch()ing a JSON file.)
+      let data = sample();
+      let current = data.map(() => 0); // animated heights start at 0
+
+      function sample() {
+        const labels = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+        return labels.map((label) => ({ label, value: Math.round(20 + Math.random() * 80) }));
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+        const max = Math.max(...data.map((d) => d.value));
+        const barW = (W - PAD * 2) / data.length;
+
+        data.forEach((d, i) => {
+          const target = ((H - PAD * 2) * d.value) / max;
+          current[i] += (target - current[i]) * 0.15; // ease toward the target height
+          const x = PAD + i * barW;
+          const y = H - PAD - current[i];
+
+          ctx.fillStyle = "steelblue";
+          ctx.fillRect(x + 4, y, barW - 8, current[i]);
+
+          ctx.fillStyle = "#333";
+          ctx.font = "12px system-ui";
+          ctx.textAlign = "center";
+          ctx.fillText(d.label, x + barW / 2, H - PAD + 14);
+          ctx.fillText(String(d.value), x + barW / 2, y - 4);
+        });
+
+        // Keep animating until every bar is within 0.5px of its target.
+        const max2 = Math.max(...data.map((d) => d.value));
+        const settled = data.every(
+          (d, i) => Math.abs(((H - PAD * 2) * d.value) / max2 - current[i]) < 0.5,
+        );
+        if (!settled) requestAnimationFrame(draw);
+      }
+
+      document.querySelector("#shuffle").addEventListener("click", () => {
+        data = sample();
+        if (current.length !== data.length) current = data.map(() => 0);
+        draw();
+      });
+
+      draw();
+    </script>
+  </body>
+</html>

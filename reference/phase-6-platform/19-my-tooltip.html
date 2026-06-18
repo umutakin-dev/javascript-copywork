@@ -1,0 +1,46 @@
+<!doctype html>
+<!--
+  Phase 6 · 19 — <my-tooltip>: hover/focus tooltip via a slot + :host styles
+  Pure CSS shows the bubble on :hover / :focus-within — no JS state needed.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/Web_components
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Web Components: my-tooltip</title>
+  </head>
+  <body>
+    <p>
+      Hover
+      <my-tooltip text="A web-standard component model.">
+        <span slot="trigger">Web Components</span>
+      </my-tooltip>
+      to learn more.
+    </p>
+
+    <script type="module">
+      class MyTooltip extends HTMLElement {
+        connectedCallback() {
+          const text = this.getAttribute("text") ?? "";
+          this.attachShadow({ mode: "open" }).innerHTML = `
+            <style>
+              :host { position: relative; display: inline-block; }
+              .trigger { text-decoration: underline dotted; cursor: help; }
+              .bubble {
+                position: absolute; bottom: 125%; left: 0;
+                background: #222; color: #fff; padding: .25rem .5rem;
+                border-radius: 4px; white-space: nowrap; font-size: .85rem;
+                opacity: 0; transition: opacity .15s; pointer-events: none;
+              }
+              :host(:hover) .bubble, :host(:focus-within) .bubble { opacity: 1; }
+            </style>
+            <span class="trigger" tabindex="0"><slot name="trigger">?</slot></span>
+            <span class="bubble" role="tooltip"></span>
+          `;
+          this.shadowRoot.querySelector(".bubble").textContent = text;
+        }
+      }
+      customElements.define("my-tooltip", MyTooltip);
+    </script>
+  </body>
+</html>

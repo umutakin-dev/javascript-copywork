@@ -1,0 +1,36 @@
+<!doctype html>
+<!--
+  Phase 6 · 29 — requestAnimationFrame: a bouncing box on <canvas>
+  rAF runs your callback right before the next paint (~60fps) and pauses in
+  background tabs — the standard animation loop.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/Window/requestAnimationFrame
+-->
+<html lang="en">
+  <head><meta charset="utf-8" /><title>requestAnimationFrame</title></head>
+  <body>
+    <canvas id="c" width="320" height="180" style="border:1px solid #999"></canvas>
+    <script type="module">
+      const ctx = document.querySelector("#c").getContext("2d");
+      const W = ctx.canvas.width;
+      const H = ctx.canvas.height;
+
+      let x = 20;
+      let y = 20;
+      let vx = 2.5;
+      let vy = 2;
+      const size = 20;
+
+      function frame() {
+        ctx.clearRect(0, 0, W, H);
+        x += vx;
+        y += vy;
+        if (x <= 0 || x + size >= W) vx = -vx; // bounce off left/right walls
+        if (y <= 0 || y + size >= H) vy = -vy; // bounce off top/bottom walls
+        ctx.fillStyle = "tomato";
+        ctx.fillRect(x, y, size, size);
+        requestAnimationFrame(frame); // schedule the next frame
+      }
+      requestAnimationFrame(frame);
+    </script>
+  </body>
+</html>

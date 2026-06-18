@@ -1,0 +1,48 @@
+<!doctype html>
+<!--
+  Phase 6 · 14 — Lifecycle: connected / disconnected + attributeChanged
+  observedAttributes lists which attributes trigger attributeChangedCallback.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_custom_elements#using_the_lifecycle_callbacks
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Web Components: lifecycle</title>
+  </head>
+  <body>
+    <user-badge name="Umut"></user-badge>
+    <button id="rename">Rename to Alice</button>
+    <button id="remove">Remove element</button>
+
+    <script type="module">
+      class UserBadge extends HTMLElement {
+        // ONLY attributes listed here fire attributeChangedCallback.
+        static observedAttributes = ["name"];
+
+        connectedCallback() {
+          console.log("connected");
+          this.render();
+        }
+        disconnectedCallback() {
+          console.log("disconnected (tear down listeners/timers here)");
+        }
+        attributeChangedCallback(attr, oldValue, newValue) {
+          console.log(`attr ${attr}: ${oldValue} -> ${newValue}`);
+          this.render();
+        }
+        render() {
+          this.textContent = `👤 ${this.getAttribute("name") ?? "anon"}`;
+        }
+      }
+      customElements.define("user-badge", UserBadge);
+
+      const badge = document.querySelector("user-badge");
+      document.querySelector("#rename").addEventListener("click", () => {
+        badge.setAttribute("name", "Alice"); // -> attributeChangedCallback
+      });
+      document.querySelector("#remove").addEventListener("click", () => {
+        badge.remove(); // -> disconnectedCallback
+      });
+    </script>
+  </body>
+</html>
