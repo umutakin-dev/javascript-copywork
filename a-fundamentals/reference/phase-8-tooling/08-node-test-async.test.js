@@ -1,7 +1,7 @@
 // Phase 8 · 08 — Testing ASYNC code with the built-in runner
 // An async test just returns a promise; assertions work the same. Two helpers,
 // assert.rejects / assert.doesNotReject, are made for promise outcomes.
-// Run it:  node --test reference/phase-8-tooling/08-node-test-async.test.js
+// Run it:  node --test a-fundamentals/reference/phase-8-tooling/08-node-test-async.test.js
 //
 // Ref: https://nodejs.org/api/test.html#testing-asynchronous-code
 

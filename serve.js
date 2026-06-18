@@ -6,7 +6,7 @@
 //
 //   Run:   bun serve.js
 //   Open:  http://localhost:8000/
-//          http://localhost:8000/reference/phase-6-platform/01-select-create-remove.html
+//          http://localhost:8000/a-fundamentals/reference/phase-6-platform/01-select-create-remove.html
 //   Stop:  Ctrl-C
 //
 // Set a different port with:  PORT=3000 bun serve.js
@@ -70,5 +70,5 @@ const server = Bun.serve({
 
 console.log(`Serving ${root}`);
 console.log(`→ http://localhost:${server.port}/`);
-console.log(`  e.g. http://localhost:${server.port}/reference/phase-6-platform/17-my-counter.html`);
+console.log(`  e.g. http://localhost:${server.port}/a-fundamentals/reference/phase-6-platform/17-my-counter.html`);
 console.log("Ctrl-C to stop.");

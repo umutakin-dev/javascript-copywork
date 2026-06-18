@@ -1,7 +1,7 @@
 // Phase 8 · 07 — Testing a pure function with the BUILT-IN runner
 // No Jest, no config. Run it:
-//   node --test reference/phase-8-tooling/07-node-test-pure.test.js
-//   bun test  reference/phase-8-tooling/07-node-test-pure.test.js
+//   node --test a-fundamentals/reference/phase-8-tooling/07-node-test-pure.test.js
+//   bun test  a-fundamentals/reference/phase-8-tooling/07-node-test-pure.test.js
 //
 // Ref: https://nodejs.org/api/test.html
 

@@ -1,5 +1,5 @@
 // Phase 0 · 06 — Importing module A
-// Run THIS file:  bun reference/phase-0-env/06-module-b.js
+// Run THIS file:  bun a-fundamentals/reference/phase-0-env/06-module-b.js
 // (it pulls in 05-module-a.js)
 //
 // Ref: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import

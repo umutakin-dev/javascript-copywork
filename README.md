@@ -1,25 +1,36 @@
-# Modern JavaScript — Copywork
+# Copywork — Modern JavaScript & the Web Platform
 
-Hand-type your way to fluent modern JavaScript. Web standards only — no
-frameworks, no TypeScript. Plain JS + JSDoc.
+Two hand-typed **copywork** curricula for internalizing web standards — no
+frameworks, no TypeScript, plain JS + JSDoc. The method (K&R / C-primer style):
+you read a complete, correct program and retype it *by hand* until the syntax
+lives in your fingers. You already know how to program — the goal is to
+internalize the *surface*: idioms, quirks, the runtime, the web platform.
 
-This is **copywork**: the old K&R / C-primer method. You read a complete,
-correct program and retype it *by hand* until the syntax lives in your fingers.
-You already know how to program — the goal here is to internalize the *surface*
-of JavaScript: its idioms, quirks, runtime, and the web platform.
+## Curricula
+
+- **[a-fundamentals/](a-fundamentals/curriculum.md)** — modern JavaScript: runtime,
+  values & coercion, objects/prototypes, modern syntax, iteration, async, the web
+  platform, metaprogramming, JSDoc/testing. 149 verified programs across 9 phases
+  plus capstone projects. **Start here.**
+- **[b-web-platform/](b-web-platform/curriculum.md)** — real-time graphics &
+  communication: WebGL2 → WebGPU, WebRTC, Web Audio. *(in progress)*
 
 ## Layout
 
 ```
-javascript-copywork-curriculum.md   the plan: phases, topics, checkboxes
-reference/                          the listings you READ and copy FROM
-  phase-0-env/  phase-1-values/  ...
-practice/                           where YOU type your hand-written copies
-  phase-0-env/  phase-1-values/  ...
-.vscode/settings.json               "copywork mode" — autocomplete/AI/lint off
+a-fundamentals/
+  curriculum.md          the plan: phases, topics, checkboxes
+  reference/             the listings you READ and copy FROM
+    phase-0-env/ phase-1-values/ ...
+  practice/              where YOU type your hand-written copies (mirror)
+b-web-platform/
+  curriculum.md          graphics & realtime plan
+  reference/ practice/ servers/ assets/
+serve.js                 static dev server for the browser pages — `bun serve.js`
+.vscode/settings.json    "copywork mode" — autocomplete/AI/lint off
 ```
 
-`reference/` and `practice/` mirror each other file-for-file.
+Within each curriculum, `reference/` and `practice/` mirror each other file-for-file.
 
 ## The loop
 
@@ -31,12 +42,12 @@ practice/                           where YOU type your hand-written copies
 4. Self-check **by output, not by source text**. The reference's `// expected`
    notes are your answer key — run your copy and confirm it prints the same:
    ```bash
-   bun practice/phase-1-values/01-typeof.js
+   bun a-fundamentals/practice/phase-1-values/01-typeof.js
    ```
    To compare mechanically, diff the *output* (comments don't matter this way):
    ```bash
-   diff <(bun practice/phase-1-values/01-typeof.js) \
-        <(bun reference/phase-1-values/01-typeof.js)
+   diff <(bun a-fundamentals/practice/phase-1-values/01-typeof.js) \
+        <(bun a-fundamentals/reference/phase-1-values/01-typeof.js)
    ```
    (A byte-exact `diff` of the two *files* is a stricter, optional check — it
    asks "did I transcribe every character," and only then do comments count.)
@@ -55,7 +66,7 @@ reward a struggle-first pass.
 
 - **Phases 1–5, 7, 8** are plain `.js` and run in any standalone runtime:
   ```bash
-  bun reference/phase-1-values/01-typeof.js
+  bun a-fundamentals/reference/phase-1-values/01-typeof.js
   # or: node <file>   /   deno run <file>
   ```
   Every file ends by `console.log`-ing its result, with a `console.assert`
@@ -68,8 +79,8 @@ reward a struggle-first pass.
   bun serve.js     # prints a URL (auto-rolls to a free port if 8000 is busy)
   ```
 
-  Then open, e.g., `http://localhost:8000/reference/phase-6-platform/17-my-counter.html`
-  (or the projects under `/reference/projects/`). `serve.js` serves files plainly
+  Then open, e.g., `http://localhost:8000/a-fundamentals/reference/phase-6-platform/17-my-counter.html`
+  (or the projects under `/a-fundamentals/reference/projects/`). `serve.js` serves files plainly
   — no bundling — so the browser loads your modules exactly as you typed them.
   `Ctrl-C` to stop; `PORT=3000 bun serve.js` to choose a starting port.
 
