@@ -1,0 +1,105 @@
+<!doctype html>
+<!--
+  A8 · 01 — Render to a texture, then draw that texture to the screen
+  Two passes: (1) bind an FBO and render the spinning cube INTO its color texture;
+  (2) bind the screen and draw a full-screen quad sampling that texture. This pass
+  just copies it through — it's the scaffold every post-effect (02, 03) plugs into.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/bindFramebuffer
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A8·01 render to texture</title>
+    <style>canvas { width: 360px; height: 360px; border: 1px solid #999; }</style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <script type="module">
+      import { createProgram, resizeToDisplaySize, glsl } from "../a1-webgl-first/gl.js";
+      import { perspective, lookAt, multiply, rotationX, rotationY, toRadians } from "../a5-math/math.js";
+      import { makeCube } from "../a6-3d/geometry.js";
+      import { createColorFBO, makeFullScreenQuad } from "./fbo.js";
+
+      const canvas = document.querySelector("#c");
+      const gl = canvas.getContext("webgl2");
+      if (!gl) throw new Error("WebGL2 not available");
+
+      // --- scene program (a colored cube) ---
+      const scene = createProgram(
+        gl,
+        glsl`#version 300 es
+          in vec3 a_position; in vec3 a_color; uniform mat4 u_mvp; out vec3 v_color;
+          void main() { v_color = a_color; gl_Position = u_mvp * vec4(a_position, 1.0); }`,
+        glsl`#version 300 es
+          precision highp float; in vec3 v_color; out vec4 outColor;
+          void main() { outColor = vec4(v_color, 1.0); }`,
+      );
+      // --- post program (samples the rendered texture on a full-screen quad) ---
+      const post = createProgram(
+        gl,
+        glsl`#version 300 es
+          layout(location=0) in vec2 a_position; layout(location=1) in vec2 a_uv; out vec2 v_uv;
+          void main() { v_uv = a_uv; gl_Position = vec4(a_position, 0.0, 1.0); }`,
+        glsl`#version 300 es
+          precision highp float; in vec2 v_uv; uniform sampler2D u_scene; out vec4 outColor;
+          void main() { outColor = texture(u_scene, v_uv); }`,
+      );
+
+      const cube = makeCube();
+      const sceneVao = gl.createVertexArray();
+      gl.bindVertexArray(sceneVao);
+      const vbo = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+      gl.bufferData(gl.ARRAY_BUFFER, cube.vertices, gl.STATIC_DRAW);
+      const FLOAT = 4;
+      const stride = 6 * FLOAT;
+      const posLoc = gl.getAttribLocation(scene, "a_position");
+      gl.enableVertexAttribArray(posLoc);
+      gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, stride, 0);
+      const colorLoc = gl.getAttribLocation(scene, "a_color");
+      gl.enableVertexAttribArray(colorLoc);
+      gl.vertexAttribPointer(colorLoc, 3, gl.FLOAT, false, stride, 3 * FLOAT);
+      const ibo = gl.createBuffer();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, cube.indices, gl.STATIC_DRAW);
+
+      const quadVao = makeFullScreenQuad(gl);
+      const target = createColorFBO(gl, 600, 600); // fixed-size offscreen target
+      const uMvp = gl.getUniformLocation(scene, "u_mvp");
+
+      function frame(nowMs) {
+        const t = nowMs / 1000;
+
+        // PASS 1 — render the scene into the FBO's texture.
+        gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
+        gl.viewport(0, 0, target.width, target.height);
+        gl.enable(gl.DEPTH_TEST);
+        gl.clearColor(0.08, 0.10, 0.14, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        gl.useProgram(scene);
+        gl.bindVertexArray(sceneVao);
+        const model = multiply(rotationY(t * 0.8), rotationX(t * 0.5));
+        const view = lookAt([0, 0, 3], [0, 0, 0], [0, 1, 0]);
+        const proj = perspective(toRadians(50), 1, 0.1, 100); // FBO is square
+        gl.uniformMatrix4fv(uMvp, false, multiply(multiply(proj, view), model));
+        gl.drawElements(gl.TRIANGLES, cube.indexCount, gl.UNSIGNED_SHORT, 0);
+
+        // PASS 2 — draw the texture to the screen via the full-screen quad.
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        resizeToDisplaySize(canvas);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.disable(gl.DEPTH_TEST);
+        gl.useProgram(post);
+        gl.bindVertexArray(quadVao);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, target.texture);
+        gl.uniform1i(gl.getUniformLocation(post, "u_scene"), 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+      console.log("scene rendered to a texture, then blitted to the screen");
+    </script>
+  </body>
+</html>
