@@ -82,3 +82,8 @@ dev tool and does use `Bun.serve` on purpose; it isn't part of the copywork.)
 - Keep a REPL open for one-liners: `bun repl`, `node`, or the browser console.
 - Progress and personal notes: jot them right in the curriculum file under each
   phase, or keep a scratch file here.
+
+## License
+
+[MIT](LICENSE) — free to use, copy, and adapt. If you find it useful for your own
+re-learning, go for it.
