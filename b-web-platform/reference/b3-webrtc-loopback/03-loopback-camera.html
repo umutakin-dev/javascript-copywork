@@ -1,0 +1,68 @@
+<!doctype html>
+<!--
+  B3 · 03 — Loop your camera THROUGH a peer connection
+  Add the camera's tracks to peer A (addTrack); peer B receives them (ontrack) and
+  shows the stream. The right video is your camera after a round trip through the
+  WebRTC pipeline (encode → ICE → decode) — proof real media flows, all in one page.
+  Adding tracks is what drives this negotiation, then it's the same offer/answer/ICE.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/addTrack
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>B3·03 camera loopback</title>
+    <style>
+      body { font: 15px system-ui; max-width: 42rem; margin: 2rem auto; }
+      .row { display: flex; gap: 1rem; flex-wrap: wrap; }
+      video { width: 100%; max-width: 19rem; background: #111; border-radius: 8px; }
+      #log { font: 13px monospace; }
+      #msg { color: #b00; }
+    </style>
+  </head>
+  <body>
+    <p><button id="go">Start camera + connect</button></p>
+    <p id="msg"></p>
+    <div class="row">
+      <figure><figcaption>local (direct)</figcaption><video id="local" autoplay playsinline muted></video></figure>
+      <figure><figcaption>remote (through peer B)</figcaption><video id="remote" autoplay playsinline></video></figure>
+    </div>
+    <div id="log"></div>
+    <script type="module">
+      const log = (t) => {
+        const d = document.createElement("div");
+        d.textContent = t;
+        document.querySelector("#log").append(d);
+      };
+
+      document.querySelector("#go").addEventListener("click", async (e) => {
+        e.target.disabled = true;
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          document.querySelector("#local").srcObject = stream;
+
+          const pcA = new RTCPeerConnection();
+          const pcB = new RTCPeerConnection();
+          pcA.onicecandidate = (ev) => ev.candidate && pcB.addIceCandidate(ev.candidate);
+          pcB.onicecandidate = (ev) => ev.candidate && pcA.addIceCandidate(ev.candidate);
+          pcB.onconnectionstatechange = () => log(`B: ${pcB.connectionState}`);
+
+          // A sends every camera track; B receives them and shows the stream.
+          for (const track of stream.getTracks()) pcA.addTrack(track, stream);
+          pcB.ontrack = (ev) => {
+            document.querySelector("#remote").srcObject = ev.streams[0];
+            log("B received a remote track");
+          };
+
+          const offer = await pcA.createOffer();
+          await pcA.setLocalDescription(offer);
+          await pcB.setRemoteDescription(offer);
+          const answer = await pcB.createAnswer();
+          await pcB.setLocalDescription(answer);
+          await pcA.setRemoteDescription(answer);
+        } catch (err) {
+          document.querySelector("#msg").textContent = `${err.name}: ${err.message}`;
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,62 @@
+<!doctype html>
+<!--
+  B3 · 02 — The WebRTC state machines (watch them transition)
+  A peer connection runs four state machines at once. Watching them light up during
+  a handshake demystifies "why isn't it connecting":
+    signalingState     — where we are in offer/answer (stable → have-local-offer → stable)
+    iceGatheringState  — finding network candidates (new → gathering → complete)
+    iceConnectionState — connectivity checks (checking → connected → completed)
+    connectionState    — the overall summary (connecting → connected)
+  We also print the offer SDP so you can see what's actually exchanged.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/connectionState
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>B3·02 state machine</title>
+    <style>
+      body { font: 15px system-ui; max-width: 40rem; margin: 2rem auto; }
+      #log { font: 13px monospace; white-space: pre-wrap; }
+      pre { background: #f4f4f4; padding: .5rem; max-height: 10rem; overflow: auto; font-size: 11px; }
+    </style>
+  </head>
+  <body>
+    <p><button id="go">Run handshake</button></p>
+    <div id="log"></div>
+    <h4>offer SDP</h4>
+    <pre id="sdp"></pre>
+    <script type="module">
+      const log = (t) => {
+        const d = document.createElement("div");
+        d.textContent = t;
+        document.querySelector("#log").append(d);
+      };
+      // Attach loggers for every state machine on a connection, labelled A or B.
+      function watch(pc, who) {
+        pc.onsignalingstatechange = () => log(`${who} signaling:     ${pc.signalingState}`);
+        pc.onicegatheringstatechange = () => log(`${who} iceGathering:  ${pc.iceGatheringState}`);
+        pc.oniceconnectionstatechange = () => log(`${who} iceConnection: ${pc.iceConnectionState}`);
+        pc.onconnectionstatechange = () => log(`${who} connection:    ${pc.connectionState}`);
+      }
+
+      document.querySelector("#go").addEventListener("click", async (e) => {
+        e.target.disabled = true;
+        const pcA = new RTCPeerConnection();
+        const pcB = new RTCPeerConnection();
+        watch(pcA, "A");
+        watch(pcB, "B");
+        pcA.onicecandidate = (ev) => ev.candidate && pcB.addIceCandidate(ev.candidate);
+        pcB.onicecandidate = (ev) => ev.candidate && pcA.addIceCandidate(ev.candidate);
+
+        pcA.createDataChannel("x"); // give the negotiation something to do
+        const offer = await pcA.createOffer();
+        document.querySelector("#sdp").textContent = offer.sdp;
+        await pcA.setLocalDescription(offer);
+        await pcB.setRemoteDescription(offer);
+        const answer = await pcB.createAnswer();
+        await pcB.setLocalDescription(answer);
+        await pcA.setRemoteDescription(answer);
+      });
+    </script>
+  </body>
+</html>
