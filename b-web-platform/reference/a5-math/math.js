@@ -155,4 +155,48 @@ export function transformVec4(m, v) {
   ];
 }
 
+/**
+ * The NORMAL MATRIX: the inverse-transpose of a model matrix's upper-left 3×3,
+ * returned as a column-major mat3 (9 elements) for `uniform mat3 u_normalMatrix`.
+ * Normals must be transformed by THIS, not the model matrix, so non-uniform
+ * scaling doesn't tilt them off the surface. For a pure rotation it equals the
+ * rotation's 3×3; for scale(2,1,1) it is scale(0.5,1,1) — the inverse scale.
+ * (Introduced in A7 · lighting.)
+ * @param {number[]} m - a column-major mat4
+ * @returns {number[]} a column-major mat3
+ */
+export function normalMatrix(m) {
+  // Upper-left 3×3 entries; for a column-major mat4, M[row][col] = m[col*4 + row].
+  const m00 = m[0];
+  const m10 = m[1];
+  const m20 = m[2];
+  const m01 = m[4];
+  const m11 = m[5];
+  const m21 = m[6];
+  const m02 = m[8];
+  const m12 = m[9];
+  const m22 = m[10];
+
+  // Cofactors of the 3×3.
+  const c00 = m11 * m22 - m12 * m21;
+  const c01 = -(m10 * m22 - m12 * m20);
+  const c02 = m10 * m21 - m11 * m20;
+  const c10 = -(m01 * m22 - m02 * m21);
+  const c11 = m00 * m22 - m02 * m20;
+  const c12 = -(m00 * m21 - m01 * m20);
+  const c20 = m01 * m12 - m02 * m11;
+  const c21 = -(m00 * m12 - m02 * m10);
+  const c22 = m00 * m11 - m01 * m10;
+
+  const det = m00 * c00 + m01 * c01 + m02 * c02;
+  const inv = det === 0 ? 0 : 1 / det;
+
+  // (M^-1)^T equals the cofactor matrix / det. Stored column-major.
+  return [
+    c00 * inv, c10 * inv, c20 * inv,
+    c01 * inv, c11 * inv, c21 * inv,
+    c02 * inv, c12 * inv, c22 * inv,
+  ];
+}
+
 export const toRadians = (deg) => (deg * Math.PI) / 180;

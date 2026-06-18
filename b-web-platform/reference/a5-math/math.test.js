@@ -25,6 +25,7 @@ import {
   perspective,
   lookAt,
   transformVec4,
+  normalMatrix,
   toRadians,
 } from "./math.js";
 
@@ -91,4 +92,15 @@ test("perspective matches the derived entries", () => {
 test("lookAt from (0,0,5) is a -5 z translation", () => {
   const v = lookAt([0, 0, 5], [0, 0, 0], [0, 1, 0]);
   arrClose(v, translation(0, 0, -5), "view = identity rotation + translate z by -5");
+});
+
+test("normalMatrix of a rotation equals its 3×3", () => {
+  const r = rotationZ(toRadians(40));
+  const mat3OfR = [r[0], r[1], r[2], r[4], r[5], r[6], r[8], r[9], r[10]];
+  arrClose(normalMatrix(r), mat3OfR, "rotation: normal matrix = the rotation itself");
+});
+
+test("normalMatrix inverts non-uniform scale", () => {
+  // scale(2,4,0.5) on positions → scale(0.5, 0.25, 2) on normals.
+  arrClose(normalMatrix(scaling(2, 4, 0.5)), [0.5, 0, 0, 0, 0.25, 0, 0, 0, 2], "inverse scale");
 });
