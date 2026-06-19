@@ -1,0 +1,71 @@
+<!doctype html>
+<!--
+  B6 · 01 — MediaRecorder: record a stream to a downloadable clip
+  MediaRecorder takes any MediaStream (camera, screen, canvas) and emits encoded
+  chunks ("dataavailable"). Collect them into a Blob, then download it or play it
+  back. WebM/VP8/9 is the broadly-supported container/codec in browsers.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>B6·01 record camera</title>
+    <style>
+      body { font: 15px system-ui; max-width: 40rem; margin: 2rem auto; }
+      .row { display: flex; gap: 1rem; flex-wrap: wrap; }
+      video { width: 100%; max-width: 19rem; background: #111; border-radius: 8px; }
+      #msg { color: #b00; }
+    </style>
+  </head>
+  <body>
+    <p>
+      <button id="start">Start camera</button>
+      <button id="rec" disabled>Record</button>
+      <a id="save" hidden>Download</a>
+    </p>
+    <p id="msg"></p>
+    <div class="row">
+      <figure><figcaption>live</figcaption><video id="live" autoplay playsinline muted></video></figure>
+      <figure><figcaption>playback</figcaption><video id="play" controls></video></figure>
+    </div>
+    <script type="module">
+      const msg = document.querySelector("#msg");
+      const recBtn = document.querySelector("#rec");
+      let stream;
+      let recorder;
+      let chunks = [];
+
+      document.querySelector("#start").addEventListener("click", async () => {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          document.querySelector("#live").srcObject = stream;
+          recBtn.disabled = false;
+        } catch (err) {
+          msg.textContent = `${err.name}: ${err.message}`;
+        }
+      });
+
+      recBtn.addEventListener("click", () => {
+        if (!recorder || recorder.state === "inactive") {
+          chunks = [];
+          recorder = new MediaRecorder(stream, { mimeType: "video/webm" });
+          recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+          recorder.onstop = () => {
+            const blob = new Blob(chunks, { type: "video/webm" });
+            const url = URL.createObjectURL(blob);
+            document.querySelector("#play").src = url;
+            const a = document.querySelector("#save");
+            a.href = url;
+            a.download = "recording.webm";
+            a.hidden = false;
+          };
+          recorder.start();
+          recBtn.textContent = "Stop";
+        } else {
+          recorder.stop();
+          recBtn.textContent = "Record";
+        }
+      });
+    </script>
+  </body>
+</html>
