@@ -1,0 +1,174 @@
+<!doctype html>
+<!--
+  B5 · 01 — A real peer-to-peer video call (two tabs / two devices)
+  Now the two peers are SEPARATE pages, so SDP and ICE travel through the Bun
+  signaling server. Start signaling-server.js, then open this page in two tabs with
+  the same ?room. Highlights:
+    - PERFECT NEGOTIATION (polite/impolite) handles offer/answer collisions cleanly,
+      and makes mid-call renegotiation "just work",
+    - a public STUN server discovers your public address for NAT traversal
+      (a TURN relay would be needed only when both peers are behind strict NATs),
+    - "Share screen" adds a track mid-call → renegotiation fires automatically,
+    - getStats() shows live outbound bitrate.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Perfect_negotiation
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>B5·01 P2P call</title>
+    <style>
+      body { font: 15px system-ui; max-width: 44rem; margin: 2rem auto; }
+      .row { display: flex; gap: 1rem; flex-wrap: wrap; }
+      video { width: 100%; max-width: 20rem; background: #111; border-radius: 8px; }
+      #log { font: 12px monospace; white-space: pre-wrap; color: #555; }
+      #msg { color: #b00; }
+    </style>
+  </head>
+  <body>
+    <p>
+      room: <input id="room" value="demo" /> <button id="join">Join</button>
+      <button id="mic" disabled>Mute mic</button>
+      <button id="cam" disabled>Stop cam</button>
+      <button id="screen" disabled>Share screen</button>
+    </p>
+    <p>stats: <b id="stats">—</b></p>
+    <p id="msg"></p>
+    <div class="row">
+      <figure><figcaption>you</figcaption><video id="local" autoplay playsinline muted></video></figure>
+      <figure><figcaption>peer</figcaption><video id="remote" autoplay playsinline></video></figure>
+    </div>
+    <div id="log"></div>
+    <script type="module">
+      const log = (t) => {
+        const d = document.createElement("div");
+        d.textContent = t;
+        document.querySelector("#log").append(d);
+      };
+      const msg = document.querySelector("#msg");
+
+      let pc;
+      let ws;
+      let localStream;
+      let polite = false;
+      let makingOffer = false;
+      let ignoreOffer = false;
+
+      const signal = (obj) => ws.send(JSON.stringify(obj));
+
+      document.querySelector("#join").addEventListener("click", async () => {
+        const room = document.querySelector("#room").value || "demo";
+        ws = new WebSocket(`ws://localhost:3003?room=${encodeURIComponent(room)}`);
+        ws.addEventListener("message", onSignal);
+        ws.addEventListener("error", () => (msg.textContent = "signaling error — is the server running?"));
+        document.querySelector("#join").disabled = true;
+      });
+
+      async function startCall() {
+        pc = new RTCPeerConnection({
+          iceServers: [{ urls: "stun:stun.l.google.com:19302" }], // public STUN
+        });
+
+        // Perfect negotiation: any change (addTrack, screen share) fires this.
+        pc.onnegotiationneeded = async () => {
+          try {
+            makingOffer = true;
+            await pc.setLocalDescription(); // implicit offer
+            signal({ description: pc.localDescription });
+          } catch (e) {
+            log("negotiation error: " + e.message);
+          } finally {
+            makingOffer = false;
+          }
+        };
+        pc.onicecandidate = ({ candidate }) => candidate && signal({ candidate });
+        pc.onconnectionstatechange = () => log("connection: " + pc.connectionState);
+        pc.ontrack = ({ streams }) => {
+          document.querySelector("#remote").srcObject = streams[0];
+        };
+
+        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        document.querySelector("#local").srcObject = localStream;
+        for (const track of localStream.getTracks()) pc.addTrack(track, localStream); // → onnegotiationneeded
+
+        for (const id of ["mic", "cam", "screen"]) document.querySelector("#" + id).disabled = false;
+        startStats();
+      }
+
+      async function onSignal({ data }) {
+        const m = JSON.parse(data);
+        if (m.type === "ready") {
+          polite = m.polite;
+          log(`signaling ready (polite=${polite})`);
+          await startCall().catch((e) => (msg.textContent = e.message));
+          return;
+        }
+        if (m.type === "bye") {
+          log("peer left");
+          return;
+        }
+        try {
+          if (m.description) {
+            const collision = m.description.type === "offer" && (makingOffer || pc.signalingState !== "stable");
+            ignoreOffer = !polite && collision; // impolite peer ignores a colliding offer
+            if (ignoreOffer) return;
+            await pc.setRemoteDescription(m.description);
+            if (m.description.type === "offer") {
+              await pc.setLocalDescription(); // implicit answer
+              signal({ description: pc.localDescription });
+            }
+          } else if (m.candidate) {
+            try {
+              await pc.addIceCandidate(m.candidate);
+            } catch (e) {
+              if (!ignoreOffer) throw e; // a candidate for an ignored offer is expected to fail
+            }
+          }
+        } catch (e) {
+          log("signal error: " + e.message);
+        }
+      }
+
+      // --- controls ---
+      document.querySelector("#mic").addEventListener("click", (e) => {
+        const track = localStream.getAudioTracks()[0];
+        track.enabled = !track.enabled;
+        e.target.textContent = track.enabled ? "Mute mic" : "Unmute mic";
+      });
+      document.querySelector("#cam").addEventListener("click", (e) => {
+        const track = localStream.getVideoTracks()[0];
+        track.enabled = !track.enabled;
+        e.target.textContent = track.enabled ? "Stop cam" : "Start cam";
+      });
+      document.querySelector("#screen").addEventListener("click", async () => {
+        try {
+          const display = await navigator.mediaDevices.getDisplayMedia({ video: true });
+          pc.addTrack(display.getVideoTracks()[0], display); // adding a track → renegotiation
+          log("added a screen track (renegotiating)");
+        } catch (e) {
+          /* user cancelled the picker */
+        }
+      });
+
+      // --- live stats from getStats() ---
+      let lastBytes = 0;
+      let lastTime = 0;
+      function startStats() {
+        setInterval(async () => {
+          const stats = await pc.getStats();
+          stats.forEach((report) => {
+            if (report.type === "outbound-rtp" && report.kind === "video") {
+              const now = report.timestamp;
+              const bits = (report.bytesSent - lastBytes) * 8;
+              const secs = (now - lastTime) / 1000;
+              if (lastTime && secs > 0) {
+                document.querySelector("#stats").textContent = `${Math.round(bits / secs / 1000)} kbps out`;
+              }
+              lastBytes = report.bytesSent;
+              lastTime = now;
+            }
+          });
+        }, 1000);
+      }
+    </script>
+  </body>
+</html>
