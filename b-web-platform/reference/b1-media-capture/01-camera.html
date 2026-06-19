@@ -1,0 +1,52 @@
+<!doctype html>
+<!--
+  B1 · 01 — getUserMedia: the camera into a <video>
+  navigator.mediaDevices.getUserMedia({ video: true }) returns a MediaStream you
+  assign to a <video>'s srcObject. It's async and PERMISSION-gated — the user can
+  deny, so catch the rejection (NotAllowedError / NotFoundError) and recover.
+  Needs a secure context: https:// or http://localhost — which `bun serve.js` is.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>B1·01 camera</title>
+    <style>
+      body { font: 15px system-ui; max-width: 32rem; margin: 2rem auto; }
+      video { width: 100%; background: #111; border-radius: 8px; }
+      #msg { color: #b00; }
+    </style>
+  </head>
+  <body>
+    <p><button id="start">Start camera</button> <button id="stop" disabled>Stop</button></p>
+    <p id="msg"></p>
+    <video id="video" autoplay playsinline muted></video>
+    <script type="module">
+      const video = document.querySelector("#video");
+      const msg = document.querySelector("#msg");
+      const startBtn = document.querySelector("#start");
+      const stopBtn = document.querySelector("#stop");
+      let stream = null;
+
+      startBtn.addEventListener("click", async () => {
+        msg.textContent = "";
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          video.srcObject = stream; // a MediaStream, not a URL
+          startBtn.disabled = true;
+          stopBtn.disabled = false;
+        } catch (err) {
+          // e.g. NotAllowedError (denied), NotFoundError (no camera).
+          msg.textContent = `${err.name}: ${err.message}`;
+        }
+      });
+
+      stopBtn.addEventListener("click", () => {
+        stream?.getTracks().forEach((track) => track.stop()); // turn the camera light off
+        video.srcObject = null;
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,80 @@
+<!doctype html>
+<!--
+  B3 · 01 — WebRTC loopback: the offer/answer/ICE handshake, NO server
+  Two RTCPeerConnections in ONE page negotiate with each OTHER. The dance:
+     A.createOffer → A.setLocalDescription → B.setRemoteDescription
+     B.createAnswer → B.setLocalDescription → A.setRemoteDescription
+  Meanwhile each side emits ICE candidates (onicecandidate) that we hand straight
+  to the other. We drive negotiation with a data channel and confirm when it opens.
+  In the real world A and B are on different machines and the SDP/ICE travel via a
+  SIGNALING server (that's B5) — here we just pass them directly in one page.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Connectivity
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>B3·01 loopback handshake</title>
+    <style>
+      body { font: 15px system-ui; max-width: 36rem; margin: 2rem auto; }
+      #log { font: 13px monospace; white-space: pre-wrap; margin-top: 1rem; }
+    </style>
+  </head>
+  <body>
+    <p><button id="go">Connect A ↔ B</button></p>
+    <p>A → B: <input id="msg" placeholder="say something" autocomplete="off" /> <button id="send" disabled>Send</button></p>
+    <div id="log"></div>
+    <script type="module">
+      const log = (t) => {
+        const d = document.createElement("div");
+        d.textContent = t;
+        document.querySelector("#log").append(d);
+      };
+
+      let channel;
+      document.querySelector("#go").addEventListener("click", async (e) => {
+        e.target.disabled = true;
+        const pcA = new RTCPeerConnection(); // no iceServers needed for same-machine loopback
+        const pcB = new RTCPeerConnection();
+
+        // Trickle ICE: hand every candidate one side finds to the other.
+        pcA.onicecandidate = (ev) => ev.candidate && pcB.addIceCandidate(ev.candidate);
+        pcB.onicecandidate = (ev) => ev.candidate && pcA.addIceCandidate(ev.candidate);
+        pcA.onconnectionstatechange = () => log(`connection: ${pcA.connectionState}`);
+
+        // A opens a data channel; creating it is what triggers the need to negotiate.
+        channel = pcA.createDataChannel("chat");
+        channel.onopen = () => {
+          log("data channel OPEN — peers connected!");
+          document.querySelector("#send").disabled = false;
+        };
+        channel.onmessage = (ev) => log("A received: " + ev.data);
+        pcB.ondatachannel = (ev) => {
+          const ch = ev.channel; // B's end of the same channel
+          ch.onmessage = (m) => {
+            log("B received: " + m.data);
+            ch.send("(B got it)");
+          };
+        };
+
+        // The handshake, step by step.
+        log("A: creating offer…");
+        const offer = await pcA.createOffer();
+        await pcA.setLocalDescription(offer);
+        await pcB.setRemoteDescription(offer); // B learns what A wants
+        const answer = await pcB.createAnswer();
+        await pcB.setLocalDescription(answer);
+        await pcA.setRemoteDescription(answer); // A learns B's reply
+        log("offer/answer exchanged — ICE is now connecting…");
+      });
+
+      document.querySelector("#send").addEventListener("click", () => {
+        const input = document.querySelector("#msg");
+        if (input.value) {
+          channel.send(input.value);
+          log("A sent: " + input.value);
+          input.value = "";
+        }
+      });
+    </script>
+  </body>
+</html>

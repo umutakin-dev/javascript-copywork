@@ -1,0 +1,70 @@
+<!doctype html>
+<!--
+  B6 · 03 — WebCodecs: encode frames at a low level  (:stretch: :verify-support:)
+  MediaRecorder hands you a finished file; WebCodecs gives you the raw codec —
+  feed it VideoFrames and it hands back EncodedVideoChunks (and vice versa for
+  decode). That's the foundation for custom pipelines (streaming, transcoding,
+  per-frame processing). Here we draw frames on a canvas, encode them with a
+  VideoEncoder, and report the encoded chunk sizes.
+  Support: Chrome/Edge solid; Firefox/Safari partial — guard on window.VideoEncoder.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/VideoEncoder
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>B6·03 WebCodecs</title>
+    <style>
+      body { font: 15px system-ui; max-width: 36rem; margin: 2rem auto; }
+      canvas { border: 1px solid #999; }
+      #out { font: 13px monospace; white-space: pre-wrap; }
+      #msg { color: #b00; }
+    </style>
+  </head>
+  <body>
+    <p><button id="go">Encode 30 frames</button></p>
+    <canvas id="c" width="320" height="240"></canvas>
+    <p id="msg"></p>
+    <pre id="out"></pre>
+    <script type="module">
+      const out = document.querySelector("#out");
+      const msg = document.querySelector("#msg");
+      const ctx = document.querySelector("#c").getContext("2d");
+
+      document.querySelector("#go").addEventListener("click", async () => {
+        if (!("VideoEncoder" in window)) {
+          msg.textContent = "WebCodecs (VideoEncoder) not supported in this browser.";
+          return;
+        }
+        out.textContent = "";
+        let chunkCount = 0;
+        let totalBytes = 0;
+
+        const encoder = new VideoEncoder({
+          output: (chunk) => {
+            chunkCount++;
+            totalBytes += chunk.byteLength;
+            out.textContent += `chunk ${chunkCount}: ${chunk.type}, ${chunk.byteLength} bytes\n`;
+          },
+          error: (e) => (msg.textContent = e.message),
+        });
+        encoder.configure({ codec: "vp8", width: 320, height: 240, bitrate: 1_000_000, framerate: 30 });
+
+        // Draw + encode 30 frames of a moving box.
+        for (let i = 0; i < 30; i++) {
+          ctx.fillStyle = "#123";
+          ctx.fillRect(0, 0, 320, 240);
+          ctx.fillStyle = "tomato";
+          ctx.fillRect((i * 10) % 300, 100, 20, 20);
+
+          const frame = new VideoFrame(ctx.canvas, { timestamp: (i * 1e6) / 30 }); // µs
+          encoder.encode(frame, { keyFrame: i === 0 });
+          frame.close(); // VideoFrames hold GPU/CPU memory — always close them
+        }
+
+        await encoder.flush(); // drain any buffered output
+        encoder.close();
+        out.textContent += `\nencoded ${chunkCount} chunks, ${totalBytes} bytes total`;
+      });
+    </script>
+  </body>
+</html>

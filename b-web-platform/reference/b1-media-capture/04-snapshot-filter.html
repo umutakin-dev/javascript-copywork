@@ -1,0 +1,70 @@
+<!doctype html>
+<!--
+  B1 · 04 — Snapshot a video frame into a canvas, then filter it
+  drawImage(video, ...) copies the current frame onto a canvas. From there it's
+  just pixels (A0 territory): read ImageData, apply grayscale, and offer the result
+  as a downloadable PNG via canvas.toDataURL.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/drawImage
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>B1·04 snapshot + filter</title>
+    <style>
+      body { font: 15px system-ui; max-width: 40rem; margin: 2rem auto; }
+      .row { display: flex; gap: 1rem; flex-wrap: wrap; }
+      video, canvas { width: 100%; max-width: 18rem; background: #111; border-radius: 8px; }
+      #msg { color: #b00; }
+    </style>
+  </head>
+  <body>
+    <p>
+      <button id="start">Start camera</button>
+      <button id="snap" disabled>Snapshot</button>
+      <button id="gray" disabled>Grayscale</button>
+      <a id="save" hidden>Download</a>
+    </p>
+    <p id="msg"></p>
+    <div class="row">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="canvas" width="320" height="240"></canvas>
+    </div>
+    <script type="module">
+      const video = document.querySelector("#video");
+      const canvas = document.querySelector("#canvas");
+      const ctx = canvas.getContext("2d");
+      const msg = document.querySelector("#msg");
+      const snap = document.querySelector("#snap");
+      const gray = document.querySelector("#gray");
+      const save = document.querySelector("#save");
+
+      document.querySelector("#start").addEventListener("click", async () => {
+        try {
+          video.srcObject = await navigator.mediaDevices.getUserMedia({ video: true });
+          snap.disabled = false;
+        } catch (err) {
+          msg.textContent = `${err.name}: ${err.message}`;
+        }
+      });
+
+      snap.addEventListener("click", () => {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height); // copy the current frame
+        gray.disabled = false;
+        save.hidden = false;
+        save.href = canvas.toDataURL("image/png");
+        save.download = "snapshot.png";
+      });
+
+      gray.addEventListener("click", () => {
+        const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const px = img.data;
+        for (let i = 0; i < px.length; i += 4) {
+          const g = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+          px[i] = px[i + 1] = px[i + 2] = g;
+        }
+        ctx.putImageData(img, 0, 0);
+        save.href = canvas.toDataURL("image/png");
+      });
+    </script>
+  </body>
+</html>

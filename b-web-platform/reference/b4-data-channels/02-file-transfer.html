@@ -1,0 +1,78 @@
+<!doctype html>
+<!--
+  B4 · 02 — Send a file in chunks, with progress + backpressure
+  A data channel sends one message at a time, so a file goes as a stream of binary
+  chunks framed by small JSON control messages (meta / done). The sender watches
+  bufferedAmount and pauses on "bufferedamountlow" so it doesn't flood the channel;
+  the receiver reassembles the chunks into a Blob and offers a download.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/RTCDataChannel/bufferedAmount
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>B4·02 file transfer</title>
+    <style>
+      body { font: 15px system-ui; max-width: 34rem; margin: 2rem auto; }
+      progress { width: 100%; }
+    </style>
+  </head>
+  <body>
+    <p>Pick a file to send A → B: <input id="file" type="file" disabled /></p>
+    <p>send: <progress id="sp" value="0" max="1"></progress></p>
+    <p>receive: <progress id="rp" value="0" max="1"></progress> <a id="save" hidden>Download</a></p>
+    <script type="module">
+      import { connectLoopback, negotiate } from "./loopback.js";
+
+      const pcA = new RTCPeerConnection();
+      const pcB = new RTCPeerConnection();
+      connectLoopback(pcA, pcB);
+
+      const CHUNK = 16 * 1024;
+      const chA = pcA.createDataChannel("file");
+      chA.binaryType = "arraybuffer";
+      chA.bufferedAmountLowThreshold = 256 * 1024; // fire "bufferedamountlow" below this
+      chA.onopen = () => (document.querySelector("#file").disabled = false);
+
+      // Receiver side (B): collect chunks between a meta and a done message.
+      let incoming = null;
+      pcB.ondatachannel = (e) => {
+        const ch = e.channel;
+        ch.binaryType = "arraybuffer";
+        ch.onmessage = (ev) => {
+          if (typeof ev.data === "string") {
+            const m = JSON.parse(ev.data);
+            if (m.type === "meta") incoming = { name: m.name, size: m.size, parts: [], got: 0 };
+            else if (m.type === "done") {
+              const blob = new Blob(incoming.parts);
+              const a = document.querySelector("#save");
+              a.href = URL.createObjectURL(blob);
+              a.download = incoming.name;
+              a.hidden = false;
+            }
+          } else {
+            incoming.parts.push(ev.data);
+            incoming.got += ev.data.byteLength;
+            document.querySelector("#rp").value = incoming.got / incoming.size;
+          }
+        };
+      };
+
+      await negotiate(pcA, pcB);
+
+      const drained = () => new Promise((r) => chA.addEventListener("bufferedamountlow", r, { once: true }));
+
+      document.querySelector("#file").addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        chA.send(JSON.stringify({ type: "meta", name: file.name, size: file.size }));
+        const buffer = await file.arrayBuffer();
+        for (let offset = 0; offset < buffer.byteLength; offset += CHUNK) {
+          if (chA.bufferedAmount > 1 << 20) await drained(); // ~1MB queued → wait for it to drain
+          chA.send(buffer.slice(offset, offset + CHUNK));
+          document.querySelector("#sp").value = Math.min(1, (offset + CHUNK) / buffer.byteLength);
+        }
+        chA.send(JSON.stringify({ type: "done" }));
+      });
+    </script>
+  </body>
+</html>

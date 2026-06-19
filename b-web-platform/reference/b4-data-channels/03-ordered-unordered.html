@@ -1,0 +1,66 @@
+<!doctype html>
+<!--
+  B4 · 03 — Reliable/ordered vs unreliable/unordered channels
+  Data channels are configurable when you create them:
+    {}                                   → reliable + ordered (like TCP) — the default
+    { ordered: false, maxRetransmits: 0 }→ unreliable + unordered (like UDP) — lowest
+                                           latency, may drop/reorder; good for game state
+    { maxPacketLifeTime: 50 }            → give up retransmitting after 50ms
+  On a perfect loopback nothing is actually lost, so this prints each channel's
+  negotiated settings and lets you fire messages over both.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/createDataChannel
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>B4·03 ordered vs unordered</title>
+    <style>
+      body { font: 15px system-ui; max-width: 36rem; margin: 2rem auto; }
+      #log { font: 13px monospace; white-space: pre-wrap; }
+      code { background: #f4f4f4; padding: 0 .2rem; }
+    </style>
+  </head>
+  <body>
+    <p>
+      <button id="reliable">Send 5 on reliable</button>
+      <button id="unreliable">Send 5 on unreliable</button>
+    </p>
+    <div id="log"></div>
+    <script type="module">
+      import { connectLoopback, negotiate } from "./loopback.js";
+      const log = (t) => {
+        const d = document.createElement("div");
+        d.textContent = t;
+        document.querySelector("#log").append(d);
+      };
+
+      const pcA = new RTCPeerConnection();
+      const pcB = new RTCPeerConnection();
+      connectLoopback(pcA, pcB);
+
+      // Two channels with different reliability.
+      const reliable = pcA.createDataChannel("reliable"); // {} → reliable + ordered
+      const unreliable = pcA.createDataChannel("unreliable", { ordered: false, maxRetransmits: 0 });
+
+      pcB.ondatachannel = (e) => {
+        const ch = e.channel;
+        ch.onmessage = (ev) => log(`B ← [${ch.label}] ${ev.data}`);
+      };
+
+      await negotiate(pcA, pcB);
+
+      function describe(ch) {
+        log(`"${ch.label}": ordered=${ch.ordered}, maxRetransmits=${ch.maxRetransmits}`);
+      }
+      describe(reliable);
+      describe(unreliable);
+
+      document.querySelector("#reliable").addEventListener("click", () => {
+        for (let i = 1; i <= 5; i++) reliable.send(`reliable #${i}`);
+      });
+      document.querySelector("#unreliable").addEventListener("click", () => {
+        for (let i = 1; i <= 5; i++) unreliable.send(`unreliable #${i}`);
+      });
+    </script>
+  </body>
+</html>

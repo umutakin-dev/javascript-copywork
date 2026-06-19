@@ -1,0 +1,70 @@
+<!doctype html>
+<!--
+  B2 · 03 — A BiquadFilter lowpass, and sweeping its cutoff
+  Insert a filter between source and destination to shape the timbre. A sawtooth
+  is rich in harmonics; a lowpass removes the highs above its cutoff. Drag the
+  slider to set the cutoff, or hit "Sweep" to automate it with an exponential ramp.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/BiquadFilterNode
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>B2·03 filter sweep</title>
+    <style>body { font: 15px system-ui; max-width: 32rem; margin: 2rem auto; }</style>
+  </head>
+  <body>
+    <p>
+      <button id="toggle">Start</button>
+      <button id="sweep" disabled>Sweep</button>
+    </p>
+    <p><label>cutoff <input id="cutoff" type="range" min="100" max="6000" value="800" /></label> <span id="hz">800</span> Hz</p>
+    <script type="module">
+      let ctx;
+      let osc;
+      let filter;
+      let playing = false;
+      const cutoff = document.querySelector("#cutoff");
+      const hz = document.querySelector("#hz");
+      const sweepBtn = document.querySelector("#sweep");
+
+      document.querySelector("#toggle").addEventListener("click", (e) => {
+        ctx ??= new AudioContext();
+        if (!playing) {
+          osc = ctx.createOscillator();
+          osc.type = "sawtooth";
+          osc.frequency.value = 110;
+          filter = ctx.createBiquadFilter();
+          filter.type = "lowpass";
+          filter.frequency.value = Number(cutoff.value);
+          filter.Q.value = 8; // resonance peak at the cutoff
+          const gain = ctx.createGain();
+          gain.gain.value = 0.15;
+          osc.connect(filter).connect(gain).connect(ctx.destination);
+          osc.start();
+          playing = true;
+          e.target.textContent = "Stop";
+          sweepBtn.disabled = false;
+        } else {
+          osc.stop();
+          playing = false;
+          e.target.textContent = "Start";
+          sweepBtn.disabled = true;
+        }
+      });
+
+      cutoff.addEventListener("input", () => {
+        hz.textContent = cutoff.value;
+        if (filter) filter.frequency.value = Number(cutoff.value); // live param change
+      });
+
+      sweepBtn.addEventListener("click", () => {
+        const now = ctx.currentTime;
+        // Frequency is perceived logarithmically → use an EXPONENTIAL ramp.
+        filter.frequency.cancelScheduledValues(now);
+        filter.frequency.setValueAtTime(150, now);
+        filter.frequency.exponentialRampToValueAtTime(6000, now + 1.5);
+        filter.frequency.exponentialRampToValueAtTime(150, now + 3);
+      });
+    </script>
+  </body>
+</html>

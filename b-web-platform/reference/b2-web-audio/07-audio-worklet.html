@@ -1,0 +1,56 @@
+<!doctype html>
+<!--
+  B2 · 07 — AudioWorklet: a custom DSP node on the audio thread  (:verify-support:)
+  Most Web Audio runs on a real-time audio thread. An AudioWorklet lets YOU write a
+  processor that runs there too — sample-accurate, glitch-free. Here a worklet
+  generates white noise scaled by a gain AudioParam. Load the processor module
+  first with audioWorklet.addModule, then instantiate it as an AudioWorkletNode.
+  Support: all modern browsers (secure context). Needs 07-noise-processor.js.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/AudioWorklet
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>B2·07 AudioWorklet</title>
+    <style>body { font: 15px system-ui; max-width: 32rem; margin: 2rem auto; }</style>
+  </head>
+  <body>
+    <p><button id="toggle">Start noise</button></p>
+    <p><label>gain <input id="gain" type="range" min="0" max="0.4" step="0.01" value="0.1" /></label></p>
+    <p id="msg" style="color:#b00"></p>
+    <script type="module">
+      let ctx;
+      let node;
+      let playing = false;
+      const gain = document.querySelector("#gain");
+
+      document.querySelector("#toggle").addEventListener("click", async (e) => {
+        try {
+          ctx ??= new AudioContext();
+          if (!node) {
+            // Load and register the processor module (resolved relative to this file).
+            await ctx.audioWorklet.addModule(new URL("./07-noise-processor.js", import.meta.url));
+            node = new AudioWorkletNode(ctx, "noise-gain");
+            node.parameters.get("gain").value = Number(gain.value);
+          }
+          if (!playing) {
+            node.connect(ctx.destination);
+            playing = true;
+            e.target.textContent = "Stop noise";
+          } else {
+            node.disconnect();
+            playing = false;
+            e.target.textContent = "Start noise";
+          }
+        } catch (err) {
+          document.querySelector("#msg").textContent = `${err.name}: ${err.message}`;
+        }
+      });
+
+      gain.addEventListener("input", () => {
+        // AudioParams on a worklet node are controllable from the main thread.
+        node?.parameters.get("gain").setValueAtTime(Number(gain.value), ctx.currentTime);
+      });
+    </script>
+  </body>
+</html>

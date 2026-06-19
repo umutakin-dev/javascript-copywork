@@ -1,0 +1,72 @@
+<!doctype html>
+<!--
+  B1 · 02 — enumerateDevices: list and switch cameras, ask for a resolution
+  enumerateDevices() lists the available inputs — but the labels and deviceIds are
+  hidden until the user grants permission once, so we getUserMedia first. Then we
+  can switch cameras by deviceId and request a resolution; getSettings() reports
+  what we ACTUALLY got (the browser may not honor the exact request).
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/enumerateDevices
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>B1·02 devices</title>
+    <style>
+      body { font: 15px system-ui; max-width: 32rem; margin: 2rem auto; }
+      video { width: 100%; background: #111; border-radius: 8px; }
+      #msg { color: #b00; }
+    </style>
+  </head>
+  <body>
+    <p><button id="start">Grant camera + list devices</button></p>
+    <p><label>Camera: <select id="cameras" disabled></select></label></p>
+    <p>actual: <b id="settings">—</b></p>
+    <p id="msg"></p>
+    <video id="video" autoplay playsinline muted></video>
+    <script type="module">
+      const video = document.querySelector("#video");
+      const select = document.querySelector("#cameras");
+      const settings = document.querySelector("#settings");
+      const msg = document.querySelector("#msg");
+      let stream = null;
+
+      async function start(deviceId) {
+        stream?.getTracks().forEach((t) => t.stop()); // release the old stream first
+        const constraints = {
+          video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+          },
+        };
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = stream;
+        const s = stream.getVideoTracks()[0].getSettings(); // what we really got
+        settings.textContent = `${s.width}×${s.height} @ ${s.frameRate ?? "?"}fps`;
+      }
+
+      async function listCameras() {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        select.replaceChildren();
+        for (const d of devices.filter((d) => d.kind === "videoinput")) {
+          const opt = document.createElement("option");
+          opt.value = d.deviceId;
+          opt.textContent = d.label || `camera ${select.length + 1}`;
+          select.append(opt);
+        }
+        select.disabled = false;
+      }
+
+      document.querySelector("#start").addEventListener("click", async () => {
+        msg.textContent = "";
+        try {
+          await start(); // permission prompt happens here, unlocking the labels
+          await listCameras();
+        } catch (err) {
+          msg.textContent = `${err.name}: ${err.message}`;
+        }
+      });
+      select.addEventListener("change", () => start(select.value).catch((e) => (msg.textContent = e.message)));
+    </script>
+  </body>
+</html>

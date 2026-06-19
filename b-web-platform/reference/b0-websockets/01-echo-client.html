@@ -1,0 +1,54 @@
+<!doctype html>
+<!--
+  B0 · 01 — A WebSocket echo client (browser)
+  Connect to the Bun echo server (start echo-server.js FIRST), send text, and show
+  what comes back. The WebSocket API is event-based: new WebSocket(url), then
+  open / message / close / error events, and ws.send().
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/WebSocket
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>B0·01 echo client</title>
+    <style>
+      body { font: 15px system-ui; max-width: 32rem; margin: 2rem auto; }
+      #log { font: 13px monospace; white-space: pre-wrap; margin-top: 1rem; }
+      .sent { color: #06c; }
+      .recv { color: #080; }
+    </style>
+  </head>
+  <body>
+    <p>status: <b id="status">connecting…</b> — start <code>echo-server.js</code> first</p>
+    <form id="form">
+      <input id="msg" placeholder="type a message" autocomplete="off" />
+      <button>Send</button>
+    </form>
+    <div id="log"></div>
+    <script type="module">
+      const statusEl = document.querySelector("#status");
+      const log = document.querySelector("#log");
+      function line(text, cls) {
+        const div = document.createElement("div");
+        div.textContent = text;
+        div.className = cls;
+        log.append(div);
+      }
+
+      const ws = new WebSocket("ws://localhost:3001");
+      ws.addEventListener("open", () => (statusEl.textContent = "connected"));
+      ws.addEventListener("message", (e) => line("← " + e.data, "recv"));
+      ws.addEventListener("close", () => (statusEl.textContent = "closed"));
+      ws.addEventListener("error", () => (statusEl.textContent = "error — is the server running?"));
+
+      document.querySelector("#form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const input = document.querySelector("#msg");
+        if (ws.readyState === WebSocket.OPEN && input.value) {
+          ws.send(input.value);
+          line("→ " + input.value, "sent");
+          input.value = "";
+        }
+      });
+    </script>
+  </body>
+</html>

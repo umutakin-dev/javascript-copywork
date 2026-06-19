@@ -1,0 +1,56 @@
+<!doctype html>
+<!--
+  B1 · 03 — getDisplayMedia: screen / window / tab sharing
+  getDisplayMedia() prompts the user to pick a screen, window, or tab and returns
+  a MediaStream just like a camera. The user can stop sharing from the browser's UI,
+  which fires the track's "ended" event — listen for it to update your state.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getDisplayMedia
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>B1·03 screen share</title>
+    <style>
+      body { font: 15px system-ui; max-width: 36rem; margin: 2rem auto; }
+      video { width: 100%; background: #111; border-radius: 8px; }
+      #msg { color: #b00; }
+    </style>
+  </head>
+  <body>
+    <p><button id="share">Share screen</button> <button id="stop" disabled>Stop</button></p>
+    <p>status: <b id="status">idle</b></p>
+    <p id="msg"></p>
+    <video id="video" autoplay playsinline muted></video>
+    <script type="module">
+      const video = document.querySelector("#video");
+      const statusEl = document.querySelector("#status");
+      const msg = document.querySelector("#msg");
+      const stopBtn = document.querySelector("#stop");
+      let stream = null;
+
+      function stop() {
+        stream?.getTracks().forEach((t) => t.stop());
+        video.srcObject = null;
+        statusEl.textContent = "idle";
+        stopBtn.disabled = true;
+      }
+
+      document.querySelector("#share").addEventListener("click", async () => {
+        msg.textContent = "";
+        try {
+          stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+          video.srcObject = stream;
+          statusEl.textContent = "sharing";
+          stopBtn.disabled = false;
+          // The user can end the share from the browser chrome → "ended" fires.
+          stream.getVideoTracks()[0].addEventListener("ended", stop);
+        } catch (err) {
+          // NotAllowedError if the picker is cancelled.
+          msg.textContent = `${err.name}: ${err.message}`;
+        }
+      });
+
+      stopBtn.addEventListener("click", stop);
+    </script>
+  </body>
+</html>
