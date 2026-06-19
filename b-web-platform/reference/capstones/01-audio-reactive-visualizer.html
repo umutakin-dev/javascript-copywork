@@ -1,0 +1,116 @@
+<!doctype html>
+<!--
+  Capstone 1 — Audio-reactive WebGL visualizer  (Track A × Track B)
+  The satisfying mashup: Web Audio analyses live mic input, and its frequency
+  spectrum drives a WebGL fragment shader. Each frame we copy the AnalyserNode's
+  256 frequency bins into a 256×1 texture; the shader samples that texture by angle
+  to build a circular spectrum that pulses, with a bass-driven glow at the center.
+  Make some noise / play music after clicking Start.
+  Ref: https://developer.mozilla.org/en-US/docs/Web/API/AnalyserNode/getByteFrequencyData
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Capstone · audio visualizer</title>
+    <style>
+      body { font: 15px system-ui; max-width: 40rem; margin: 1.5rem auto; }
+      canvas { width: 100%; aspect-ratio: 1; background: #000; border-radius: 8px; }
+      #msg { color: #b00; }
+    </style>
+  </head>
+  <body>
+    <p><button id="start">Start (mic)</button> <span id="msg"></span></p>
+    <canvas id="c" width="720" height="720"></canvas>
+    <script type="module">
+      import { createProgram, resizeToDisplaySize, glsl } from "../a1-webgl-first/gl.js";
+
+      const canvas = document.querySelector("#c");
+      const gl = canvas.getContext("webgl2");
+      const msg = document.querySelector("#msg");
+      if (!gl) {
+        msg.textContent = "WebGL2 not available";
+      } else {
+        const program = createProgram(
+          gl,
+          glsl`#version 300 es
+            in vec2 a_position; void main() { gl_Position = vec4(a_position, 0.0, 1.0); }`,
+          glsl`#version 300 es
+            precision highp float;
+            uniform vec2 u_resolution;
+            uniform float u_time;
+            uniform sampler2D u_freq;     // 256×1, the spectrum (0..1) in the red channel
+            out vec4 outColor;
+            const float PI = 3.14159265;
+            void main() {
+              vec2 uv = (gl_FragCoord.xy * 2.0 - u_resolution) / u_resolution.y; // centered
+              float r = length(uv);
+              float a = atan(uv.y, uv.x);              // -PI..PI
+              float t = abs(a) / PI;                   // 0..1, mirrored left/right
+              float amp = texture(u_freq, vec2(t, 0.5)).r;
+              float ring = 0.35 + amp * 0.55;          // radius pulses with the frequency
+              float edge = smoothstep(0.03, 0.0, abs(r - ring));
+              float bass = texture(u_freq, vec2(0.02, 0.5)).r; // low bins
+              vec3 col = 0.5 + 0.5 * cos(u_time + a * 3.0 + vec3(0.0, 2.0, 4.0));
+              outColor = vec4(col * edge + bass * 0.4 * exp(-r * 2.5), 1.0);
+            }`,
+        );
+
+        const vao = gl.createVertexArray();
+        gl.bindVertexArray(vao);
+        const buf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+        const loc = gl.getAttribLocation(program, "a_position");
+        gl.enableVertexAttribArray(loc);
+        gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+
+        // A single-channel texture holding the spectrum, updated every frame.
+        const BINS = 256;
+        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+        const freqTex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, freqTex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, BINS, 1, 0, gl.RED, gl.UNSIGNED_BYTE, null);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+        gl.useProgram(program);
+        gl.bindVertexArray(vao);
+        const uRes = gl.getUniformLocation(program, "u_resolution");
+        const uTime = gl.getUniformLocation(program, "u_time");
+        gl.uniform1i(gl.getUniformLocation(program, "u_freq"), 0);
+
+        document.querySelector("#start").addEventListener("click", async (e) => {
+          e.target.disabled = true;
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const audio = new AudioContext();
+            const source = audio.createMediaStreamSource(stream);
+            const analyser = audio.createAnalyser();
+            analyser.fftSize = 512; // → 256 frequency bins
+            source.connect(analyser); // no destination — avoid feedback
+            const data = new Uint8Array(analyser.frequencyBinCount);
+
+            function frame(nowMs) {
+              analyser.getByteFrequencyData(data);
+              gl.activeTexture(gl.TEXTURE0);
+              gl.bindTexture(gl.TEXTURE_2D, freqTex);
+              gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, BINS, 1, gl.RED, gl.UNSIGNED_BYTE, data);
+
+              resizeToDisplaySize(canvas);
+              gl.viewport(0, 0, canvas.width, canvas.height);
+              gl.uniform2f(uRes, canvas.width, canvas.height);
+              gl.uniform1f(uTime, nowMs / 1000);
+              gl.drawArrays(gl.TRIANGLES, 0, 6);
+              requestAnimationFrame(frame);
+            }
+            requestAnimationFrame(frame);
+          } catch (err) {
+            msg.textContent = `${err.name}: ${err.message}`;
+          }
+        });
+      }
+    </script>
+  </body>
+</html>
