@@ -12,8 +12,33 @@ internalize the *surface*: idioms, quirks, the runtime, the web platform.
   values & coercion, objects/prototypes, modern syntax, iteration, async, the web
   platform, metaprogramming, JSDoc/testing. 149 verified programs across 9 phases
   plus capstone projects. **Start here.**
-- **[b-web-platform/](b-web-platform/curriculum.md)** — real-time graphics &
-  communication: WebGL2 → WebGPU, WebRTC, Web Audio. *(in progress)*
+- **[b-web-platform/](b-web-platform/curriculum.md)** — the web platform: real-time
+  3D graphics (Canvas 2D → WebGL2 → WebGPU + compute) and real-time communication
+  (WebSockets → WebRTC → Web Audio → recording). ~90 programs across Track A,
+  Track B, and 2 capstones. ✅ complete.
+
+## Roadmap
+
+Candidate future tracks — more of the web platform, then beyond it. Not committed,
+just the map; pick whatever's interesting and we can scope it the same way (discuss
+→ curriculum doc → generate module-by-module).
+
+- **Track C — platform & systems:** Service Workers / PWA (offline, installable),
+  **WebAssembly** (run C/Rust/Zig/… in the browser — the bridge beyond JS),
+  Web Crypto (`crypto.subtle`), WebAuthn / passkeys, deeper Streams
+  (`TransformStream` + backpressure), File System Access + OPFS.
+- **Track D — networking & data:** WebTransport (HTTP/3), Server-Sent Events,
+  Media Source Extensions (adaptive streaming), Background Sync / Push.
+- **Track E — immersive & motion:** WebXR (VR/AR, on top of WebGL/WebGPU), SVG,
+  Web Animations API, View Transitions, CSS Houdini paint worklets.
+- **Track F — devices & sensors:** Geolocation, Device Orientation/Motion, Gamepad,
+  WebUSB / WebSerial / WebHID / Web Bluetooth, Screen Wake Lock.
+- **Track G — input & UX glue:** Clipboard, Drag & Drop, Web Share, Web Speech
+  (STT/TTS), Performance API + Web Vitals, the Navigation API, BroadcastChannel.
+
+**Beyond the web:** the same copywork method extends to other languages and
+runtimes (systems, native, …) — a separate effort from these web tracks, with
+WebAssembly as a natural on-ramp.
 
 ## Layout
 
